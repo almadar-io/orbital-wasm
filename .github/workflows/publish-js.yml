@@ -1,0 +1,39 @@
+name: Publish @almadar/kernel to npm
+
+on:
+  push:
+    tags:
+      - 'js-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-bindgen and binaryen
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+          sudo apt-get update && sudo apt-get install -y binaryen
+
+      - name: Build
+        working-directory: js
+        run: sh scripts/build.sh
+
+      - name: Publish
+        working-directory: js
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          npm publish --access public
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

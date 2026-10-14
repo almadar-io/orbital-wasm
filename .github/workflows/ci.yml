@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    # GitHub-hosted on purpose: a public repo runs fork PRs, which must never reach a self-hosted runner.
+    runs-on: ubuntu-latest
+    steps:
+      # The tests replay orbital-core's embed goldens from the sibling checkout.
+      - uses: actions/checkout@v4
+        with:
+          path: orbital-wasm
+      - uses: actions/checkout@v4
+        with:
+          repository: almadar-io/orbital-core
+          path: orbital-core
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the Almadar language data
+        working-directory: orbital-wasm
+        run: npm install --no-save --no-package-lock @almadar/core@^10 @almadar/std@^16 @almadar/lolo-ar@^1 @almadar/lolo-sl@^1
+
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Test
+        working-directory: orbital-wasm
+        run: cargo test
+
+      - name: Install wasm-bindgen and binaryen
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+          sudo apt-get update && sudo apt-get install -y binaryen
+
+      - name: Build and test @almadar/kernel
+        working-directory: orbital-wasm/js
+        run: |
+          sh scripts/build.sh
+          npm test

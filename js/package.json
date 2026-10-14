@@ -1,0 +1,25 @@
+{
+  "name": "@almadar/kernel",
+  "version": "18.0.0",
+  "description": "The embedded Almadar kernel as WebAssembly: Kernel (client role) and Server (server role, I/O answered by the host) over JSON strings.",
+  "license": "BUSL-1.1",
+  "type": "module",
+  "main": "./pkg/orbital_wasm.js",
+  "module": "./pkg/orbital_wasm.js",
+  "types": "./pkg/orbital_wasm.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/orbital_wasm.d.ts",
+      "default": "./pkg/orbital_wasm.js"
+    },
+    "./kernel.wasm": "./pkg/orbital_wasm_bg.wasm"
+  },
+  "files": ["pkg/orbital_wasm.js", "pkg/orbital_wasm.d.ts", "pkg/orbital_wasm_bg.wasm", "pkg/orbital_wasm_bg.wasm.d.ts"],
+  "sideEffects": false,
+  "engines": { "node": ">=22" },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "sh scripts/build.sh",
+    "test": "node --test test/*.test.mjs"
+  }
+}
