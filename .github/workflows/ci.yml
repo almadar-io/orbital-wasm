@@ -36,10 +36,13 @@ jobs:
         working-directory: orbital-wasm
         run: cargo test
 
+      # Ubuntu's binaryen is too old: its -O3 pass leaves a table the wasm-bindgen glue cannot grow. The
+      # kernel is built and tested with the same release a developer machine has.
       - name: Install wasm-bindgen and binaryen
         run: |
           cargo install wasm-bindgen-cli --version 0.2.126 --locked
-          sudo apt-get update && sudo apt-get install -y binaryen
+          curl -fsSL https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-linux.tar.gz | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/binaryen-version_133/bin" >> "$GITHUB_PATH"
 
       - name: Build and test @almadar/kernel
         working-directory: orbital-wasm/js
