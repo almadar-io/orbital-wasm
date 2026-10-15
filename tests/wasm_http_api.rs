@@ -10,7 +10,11 @@ fn parsed(text: &str) -> Value {
 const ORIGIN: &str = "https://api.example.com";
 
 fn start(request: Value, egress: Value) -> Value {
-    let call = json!({ "method": "GET", "origin": ORIGIN, "path": "/search", "request": request });
+    start_keyed(request, egress, Value::Null)
+}
+
+fn start_keyed(request: Value, egress: Value, key: Value) -> Value {
+    let call = json!({ "method": "GET", "origin": ORIGIN, "path": "/search", "request": request, "key": key });
     parsed(&http::http_driver_start(&call.to_string(), &egress.to_string()).unwrap())
 }
 
@@ -25,12 +29,12 @@ fn reply(status: u16, body: &str) -> Value {
 #[test]
 fn a_plain_get_asks_for_the_request_and_finishes_with_the_reply_payload() {
     let first = start(json!({ "query": { "q": "a b" } }), json!([ORIGIN]));
-    assert_eq!(first["step"]["status"], "ask");
+    assert_eq!(first["step"]["kind"], "ask");
     assert_eq!(first["step"]["ask"]["kind"], "http");
     assert_eq!(first["step"]["ask"]["request"]["url"], "https://api.example.com/search?q=a%20b");
     let done = resume(&first, reply(404, "nope"));
-    assert_eq!(done["step"]["status"], "done");
-    assert_eq!(done["step"]["result"]["ok"]["status"], 404);
+    assert_eq!(done["step"]["kind"], "done");
+    assert_eq!(done["step"]["result"]["ok"]["status"].as_f64(), Some(404.0));
     assert_eq!(done["step"]["result"]["ok"]["body"], "nope");
 }
 
@@ -43,11 +47,39 @@ fn a_bearer_credential_is_asked_before_the_request_and_sent_as_a_header() {
 }
 
 #[test]
-fn a_missing_credential_finishes_refused_without_an_http_ask() {
+fn a_missing_credential_finishes_unconfigured_naming_it_without_an_http_ask() {
     let first = start(json!({ "auth": { "scheme": "bearer", "credential": "KEY" } }), json!([ORIGIN]));
     let done = resume(&first, json!({ "kind": "secret", "result": { "ok": null } }));
-    assert_eq!(done["step"]["status"], "done");
-    assert_eq!(done["step"]["result"]["error"]["kind"], "refused");
+    assert_eq!(done["step"]["kind"], "done");
+    assert_eq!(done["step"]["result"]["error"]["kind"], "unconfigured");
+    assert_eq!(done["step"]["result"]["error"]["credential"], "KEY");
+}
+
+#[test]
+fn a_user_scoped_slot_asks_with_its_scope_and_an_app_slot_keeps_the_old_wire() {
+    let first = start(
+        json!({ "auth": { "scheme": "bearer", "credential": { "credential": "SESSION", "scope": "user" } } }),
+        json!([ORIGIN]),
+    );
+    assert_eq!(first["step"]["ask"], json!({ "kind": "secret", "name": "SESSION", "scope": "user" }));
+}
+
+#[test]
+fn a_multipart_call_asks_for_random_bytes_and_a_retry_carries_its_delay() {
+    let first = start(
+        json!({ "multipart": { "kind": "related", "parts": [{ "text": "x" }] },
+                "retry": { "max": 1, "on": ["5xx"], "backoffMs": 40 } }),
+        json!([ORIGIN]),
+    );
+    assert_eq!(first["step"]["ask"], json!({ "kind": "random", "bytes": 16 }));
+    let sent = resume(&first, json!({ "kind": "random", "result": { "ok": "AAECAwQFBgcICQoLDA0ODw==" } }));
+    assert_eq!(sent["step"]["ask"]["kind"], "http");
+    assert!(sent["step"]["ask"].get("delayMs").is_none());
+    let retried = resume(&sent, reply(503, "busy"));
+    assert_eq!(retried["step"]["ask"]["delayMs"], 40);
+    assert_eq!(retried["step"]["ask"]["request"], sent["step"]["ask"]["request"]);
+    let bad = http::http_driver_resume(&sent["driver"].to_string(), r#"{"kind":"random","result":{"ok":"!!"}}"#);
+    assert!(bad.is_err(), "undecodable random bytes are an error, not a call outcome");
 }
 
 #[test]
@@ -86,14 +118,93 @@ fn classifies_addresses() {
     assert!(http::is_public_address("not an ip").is_err());
 }
 
+fn streaming(framing: &str) -> String {
+    start_keyed(json!({ "stream": framing }), json!([ORIGIN]), json!("k1"))["driver"].to_string()
+}
+
 #[test]
-fn frames_sse_events_hands_back_the_tail_and_flushes_it_at_the_end() {
-    let first = parsed(&http::stream_events("sse", "data: one\n\ndata: tw", "").unwrap());
+fn frames_sse_events_with_the_drivers_key_hands_back_the_tail_and_flushes_it_at_the_end() {
+    let driver = streaming("sse");
+    let first = parsed(&http::stream_events(&driver, "data: one\n\ndata: tw", "").unwrap());
     assert_eq!(first["events"].as_array().unwrap().len(), 1);
     assert_eq!(first["events"][0]["data"], "one");
+    assert_eq!(first["events"][0]["key"], "k1");
     let carry = first["carry"].as_str().unwrap().to_string();
-    let second = parsed(&http::stream_events("sse", "o\n\n", &carry).unwrap());
+    let second = parsed(&http::stream_events(&driver, "o\n\n", &carry).unwrap());
     assert_eq!(second["events"][0]["data"], "two");
-    let flushed = parsed(&http::stream_finish("jsonLines", "{\"a\":1}").unwrap());
+    let lines = streaming("json-lines");
+    let flushed = parsed(&http::stream_finish(&lines, "{\"a\":1}").unwrap());
     assert_eq!(flushed.as_array().unwrap().len(), 1);
+    assert_eq!(flushed[0]["key"], "k1");
+}
+
+#[test]
+fn a_streaming_call_asks_for_a_stream() {
+    let first = parsed(&streaming_progress());
+    assert_eq!(first["step"]["ask"]["kind"], "httpStream");
+    assert_eq!(first["step"]["ask"]["framing"], "sse");
+}
+
+fn streaming_progress() -> String {
+    let call = json!({ "method": "GET", "origin": ORIGIN, "path": "/s", "request": { "stream": "sse" } });
+    http::http_driver_start(&call.to_string(), &json!([ORIGIN]).to_string()).unwrap()
+}
+
+#[test]
+fn the_key_is_echoed_in_replies_and_refusals_and_null_when_unkeyed() {
+    let keyed = start_keyed(json!({}), json!([ORIGIN]), json!("k1"));
+    let done = resume(&keyed, reply(200, "ok"));
+    assert_eq!(done["step"]["result"]["ok"]["key"], "k1");
+    let refused = start_keyed(json!({}), json!([]), json!("k1"));
+    assert_eq!(refused["step"]["result"]["error"]["key"], "k1");
+    let unkeyed = resume(&start(json!({}), json!([ORIGIN])), reply(200, "ok"));
+    assert_eq!(unkeyed["step"]["result"]["ok"]["key"], Value::Null);
+}
+
+#[test]
+fn a_call_that_fails_to_parse_is_refused_with_no_driver() {
+    let done = start(json!({ "bogus": 1 }), json!([ORIGIN]));
+    assert_eq!(done["driver"], Value::Null);
+    assert_eq!(done["step"]["result"]["error"]["kind"], "refused");
+}
+
+#[test]
+fn frame_stream_frames_with_the_asks_key_without_a_driver() {
+    let first = parsed(&http::frame_stream("sse", Some("k9"), "data: one\n\ndata: tw", "").unwrap());
+    assert_eq!(first["events"].as_array().unwrap().len(), 1);
+    assert_eq!(first["events"][0]["data"], "one");
+    assert_eq!(first["events"][0]["key"], "k9");
+    let carry = first["carry"].as_str().unwrap().to_string();
+    let second = parsed(&http::frame_stream("sse", Some("k9"), "o\n\n", &carry).unwrap());
+    assert_eq!(second["events"][0]["data"], "two");
+    let lines = parsed(&http::frame_stream("jsonLines", Some("k9"), "{\"a\":1}\n{\"b\"", "").unwrap());
+    assert_eq!(lines["events"].as_array().unwrap().len(), 1);
+    let flushed = parsed(&http::frame_stream_finish("jsonLines", Some("k9"), lines["carry"].as_str().unwrap()).unwrap());
+    assert_eq!(flushed.as_array().unwrap().len(), 1, "the unterminated tail is flushed as its own event");
+    assert_eq!(flushed[0]["key"], "k9");
+    assert!(http::frame_stream_finish("jsonLines", Some("k9"), "").unwrap().starts_with("[]"), "an empty tail yields nothing");
+    let tail = parsed(&http::frame_stream_finish("jsonLines", Some("k9"), "{\"a\":1}").unwrap());
+    assert_eq!(tail[0]["key"], "k9");
+}
+
+#[test]
+fn frame_stream_unkeyed_events_carry_a_null_key_and_an_unknown_framing_is_an_error() {
+    let unkeyed = parsed(&http::frame_stream("sse", None, "data: x\n\n", "").unwrap());
+    assert_eq!(unkeyed["events"][0]["key"], Value::Null);
+    assert!(http::frame_stream("xml", None, "a", "").is_err());
+    assert!(http::frame_stream_finish("xml", None, "").is_err());
+}
+
+#[test]
+fn dropping_a_driver_releases_its_held_credentials() {
+    let call = json!({ "method": "GET", "origin": ORIGIN, "path": "/x", "request": { "auth": { "scheme": "basic", "user": "USER", "credential": "PASS" } } });
+    let started = parsed(&http::http_driver_start(&call.to_string(), &json!([ORIGIN]).to_string()).unwrap());
+    let after_user = resume(&started, json!({ "kind": "secret", "result": { "ok": "alice" } }));
+    let driver = after_user["driver"].to_string();
+    http::http_driver_drop(&driver).unwrap();
+    let last = resume(&after_user, json!({ "kind": "secret", "result": { "ok": "pw" } }));
+    assert_eq!(last["step"]["kind"], "ask");
+    assert!(!last["step"]["ask"]["request"]["headers"].to_string().contains("YWxpY2U6"), "the dropped user value is gone from the vault");
+    assert!(http::http_driver_drop("{").is_err());
+    http::http_driver_drop(&started["driver"].to_string()).unwrap();
 }

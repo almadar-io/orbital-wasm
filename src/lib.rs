@@ -312,12 +312,27 @@ pub fn is_public_address(ip: &str) -> Result<bool, JsError> {
     http::is_public_address(ip).map_err(js)
 }
 
+#[wasm_bindgen(js_name = frameStream)]
+pub fn frame_stream(framing: &str, key: Option<String>, chunk: &str, carry: &str) -> Result<String, JsError> {
+    http::frame_stream(framing, key.as_deref(), chunk, carry).map_err(js)
+}
+
+#[wasm_bindgen(js_name = frameStreamFinish)]
+pub fn frame_stream_finish(framing: &str, key: Option<String>, carry: &str) -> Result<String, JsError> {
+    http::frame_stream_finish(framing, key.as_deref(), carry).map_err(js)
+}
+
+#[wasm_bindgen(js_name = httpDriverDrop)]
+pub fn http_driver_drop(driver_json: &str) -> Result<(), JsError> {
+    http::http_driver_drop(driver_json).map_err(js)
+}
+
 #[wasm_bindgen(js_name = streamEvents)]
-pub fn stream_events(framing: &str, chunk: &str, carry: &str) -> Result<String, JsError> {
-    http::stream_events(framing, chunk, carry).map_err(js)
+pub fn stream_events(driver_json: &str, chunk: &str, carry: &str) -> Result<String, JsError> {
+    http::stream_events(driver_json, chunk, carry).map_err(js)
 }
 
 #[wasm_bindgen(js_name = streamFinish)]
-pub fn stream_finish(framing: &str, carry: &str) -> Result<String, JsError> {
-    http::stream_finish(framing, carry).map_err(js)
+pub fn stream_finish(driver_json: &str, carry: &str) -> Result<String, JsError> {
+    http::stream_finish(driver_json, carry).map_err(js)
 }
