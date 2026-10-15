@@ -5,6 +5,7 @@
 //! `last_error`.
 
 pub mod api;
+pub mod http;
 
 use api::{KernelApi, ServerApi};
 
@@ -153,6 +154,12 @@ impl Kernel {
         self.api.set_host_fans_out(fans_out);
     }
 
+    /// A row-set reference resolved against this kernel's rows for its current user (`{ rows, total }`).
+    #[wasm_bindgen(js_name = resolveRows)]
+    pub fn resolve_rows(&self, ref_json: &str) -> Result<String, JsError> {
+        self.api.resolve_rows(ref_json).map_err(js)
+    }
+
     pub fn seed(&self, entity_type: &str, rows_json: &str) -> Result<(), JsError> {
         self.api.seed(entity_type, rows_json).map_err(js)
     }
@@ -212,6 +219,18 @@ impl Server {
             .map_err(js)
     }
 
+    #[wasm_bindgen(js_name = resolveRows)]
+    pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, JsError> {
+        self.api.resolve_rows(ref_json, viewer_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = resumeResolve)]
+    pub fn resume_resolve(&self, flight: f64, replies_json: &str) -> Result<String, JsError> {
+        self.api
+            .resume_resolve(flight_id(flight)?, replies_json)
+            .map_err(js)
+    }
+
     pub fn abandon(&self, flight: f64) -> Result<bool, JsError> {
         Ok(self.api.abandon(flight_id(flight)?))
     }
@@ -246,6 +265,18 @@ impl Server {
             .map_err(js)
     }
 
+    #[wasm_bindgen(js_name = setCapabilities)]
+    pub fn set_capabilities(
+        &self,
+        entity_type: &str,
+        query_json: &str,
+        write_json: &str,
+    ) -> Result<(), JsError> {
+        self.api
+            .set_capabilities(entity_type, query_json, write_json)
+            .map_err(js)
+    }
+
     #[wasm_bindgen(js_name = setTickMount)]
     pub fn set_tick_mount(&self, traits_json: &str) -> Result<(), JsError> {
         self.api.set_tick_mount(traits_json).map_err(js)
@@ -262,4 +293,31 @@ impl Server {
 #[wasm_bindgen(js_name = installLanguage)]
 pub fn install_language(bundle_json: &str) -> Result<(), JsError> {
     api::install_language(bundle_json).map_err(js)
+}
+
+/// The `http` effect's sans-I/O driver (`orbital_core::runtime::http_request`) over JSON strings; each
+/// returns what `http::*` returns, or throws a JS `Error` for a malformed argument.
+#[wasm_bindgen(js_name = httpDriverStart)]
+pub fn http_driver_start(call_json: &str, egress_json: &str) -> Result<String, JsError> {
+    http::http_driver_start(call_json, egress_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = httpDriverResume)]
+pub fn http_driver_resume(driver_json: &str, answer_json: &str) -> Result<String, JsError> {
+    http::http_driver_resume(driver_json, answer_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = isPublicAddress)]
+pub fn is_public_address(ip: &str) -> Result<bool, JsError> {
+    http::is_public_address(ip).map_err(js)
+}
+
+#[wasm_bindgen(js_name = streamEvents)]
+pub fn stream_events(framing: &str, chunk: &str, carry: &str) -> Result<String, JsError> {
+    http::stream_events(framing, chunk, carry).map_err(js)
+}
+
+#[wasm_bindgen(js_name = streamFinish)]
+pub fn stream_finish(framing: &str, carry: &str) -> Result<String, JsError> {
+    http::stream_finish(framing, carry).map_err(js)
 }

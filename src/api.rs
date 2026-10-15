@@ -201,6 +201,14 @@ impl KernelApi {
         self.embedded.set_host_fans_out(fans_out);
     }
 
+    pub fn resolve_rows(&self, ref_json: &str) -> Result<String, String> {
+        self.record(
+            parse::<orbital_core::runtime::row_query::RowSetRef>(ref_json, "ref_json")
+                .and_then(|reference| self.embedded.resolve_rows(&reference))
+                .and_then(|page| to_json(&page)),
+        )
+    }
+
     pub fn seed(&self, entity_type: &str, rows_json: &str) -> Result<(), String> {
         self.record(
             parse::<Vec<Value>>(rows_json, "rows_json")
@@ -268,6 +276,17 @@ impl ServerApi {
         self.record(self.embedded.resume_json(flight, replies_json))
     }
 
+    /// Resolve a row-set reference (`RowSetRef` as JSON) for a viewer (a user as JSON) through the host-answered
+    /// store; a `ResolveProgressWire` as JSON.
+    pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
+        self.record(self.embedded.resolve_rows_json(ref_json, viewer_json))
+    }
+
+    /// Answer the requests a resolve flight is waiting on (`IoReplyWire[]` as JSON); a `ResolveProgressWire` as JSON.
+    pub fn resume_resolve(&self, flight: u64, replies_json: &str) -> Result<String, String> {
+        self.record(self.embedded.resume_resolve_json(flight, replies_json))
+    }
+
     pub fn abandon(&self, flight: u64) -> bool {
         self.embedded.abandon(flight)
     }
@@ -308,6 +327,19 @@ impl ServerApi {
                 )
                 .map(|catalogs| self.embedded.set_messages(locales, catalogs))
             }),
+        )
+    }
+
+    /// What the host's row store honours for `entity_type`: `QueryCapabilities` and `WriteCapabilities` as JSON (`null` declares nothing).
+    pub fn set_capabilities(
+        &self,
+        entity_type: &str,
+        query_json: &str,
+        write_json: &str,
+    ) -> Result<(), String> {
+        self.record(
+            self.embedded
+                .set_capabilities_json(entity_type, query_json, write_json),
         )
     }
 
