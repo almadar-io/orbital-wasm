@@ -37,7 +37,7 @@ const answerOf = (request, rows, refuse) => {
     case 'listRows':
       return { kind: 'rows', result: { ok: rows } };
     case 'readRow':
-      return { kind: 'row', result: { error: 'missing' } };
+      return { kind: 'row', result: { ok: rows.find((row) => row.id === request.id) ?? null } };
     default:
       throw new Error(`unexpected request ${request.kind}`);
   }
@@ -69,6 +69,7 @@ test('control: a refused write takes the declared failure path', async () => {
   const rows = [];
   const response = await drive(server, 'Main', { event: 'SAVE', targetTrait: 'Draft' }, rows, true);
   assert.equal(response.states.Draft, 'failed');
+  assert.equal(response.effectResults[0].error, 'disk full');
   assert.deepEqual(rows, []);
 });
 

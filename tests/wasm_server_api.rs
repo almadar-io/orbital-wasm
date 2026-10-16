@@ -30,18 +30,22 @@ fn progress(text: &str) -> Value {
     serde_json::from_str(text).unwrap()
 }
 
-fn answer(pending: &Value, create: &dyn Fn(&Value) -> Value) -> Value {
+fn answer(pending: &Value, create: &dyn Fn(&Value) -> Value, read: &dyn Fn(&Value) -> Value) -> Value {
     let request = &pending["request"];
     let result = match request["kind"].as_str().unwrap() {
         "createRow" => json!({ "kind": "row", "result": create(&request["data"]) }),
         "listRows" => json!({ "kind": "rows", "result": { "ok": [] } }),
-        "readRow" => json!({ "kind": "row", "result": { "error": "missing" } }),
+        "readRow" => json!({ "kind": "row", "result": read(&request["id"]) }),
         other => panic!("unexpected request {other}"),
     };
     json!({ "id": pending["id"], "answer": result })
 }
 
 fn run(create: &dyn Fn(&Value) -> Value) -> (Value, ServerApi) {
+    run_with_read(create, &|_| json!({"ok":null}))
+}
+
+fn run_with_read(create: &dyn Fn(&Value) -> Value, read: &dyn Fn(&Value) -> Value) -> (Value, ServerApi) {
     let api = ServerApi::new(&schema().to_string()).unwrap();
     let mut step = progress(
         &api.start(
@@ -59,7 +63,7 @@ fn run(create: &dyn Fn(&Value) -> Value) -> (Value, ServerApi) {
                     .as_array()
                     .unwrap()
                     .iter()
-                    .map(|p| answer(p, create))
+                    .map(|p| answer(p, create, read))
                     .collect();
                 step = progress(
                     &api.resume(
@@ -76,18 +80,41 @@ fn run(create: &dyn Fn(&Value) -> Value) -> (Value, ServerApi) {
 
 #[test]
 fn a_dispatch_runs_to_its_response_through_the_hosts_answers() {
-    let (response, api) = run(&|data| json!({ "ok": data }));
+    let writes = std::cell::Cell::new(0);
+    let (response, api) = run(&|data| {
+        writes.set(writes.get() + 1);
+        json!({ "ok": data })
+    });
+    assert_eq!(writes.get(), 1);
     assert_eq!(response["success"], json!(true));
-    assert_eq!(response["states"]["Draft"], json!("saved"));
+    assert_eq!(response["states"]["Draft"], json!("saved"), "{response:#}");
     assert_eq!(api.get_state("Draft", None), "saved");
     assert_eq!(api.in_flight(), 0);
 }
 
 #[test]
 fn control_a_refused_write_takes_the_failure_path() {
-    let (response, api) = run(&|_| json!({ "error": "disk full" }));
+    let writes = std::cell::Cell::new(0);
+    let (response, api) = run(&|_| {
+        writes.set(writes.get() + 1);
+        json!({ "error": "disk full" })
+    });
+    assert_eq!(writes.get(), 1);
+    assert_eq!(response["effectResults"][0]["error"], "disk full");
     assert_eq!(response["states"]["Draft"], json!("failed"));
     assert_eq!(api.get_state("Draft", None), "failed");
+}
+
+#[test]
+fn control_a_store_read_error_is_not_treated_as_an_absent_row() {
+    let writes = std::cell::Cell::new(0);
+    let (response, _) = run_with_read(&|data| {
+        writes.set(writes.get() + 1);
+        json!({"ok":data})
+    }, &|_| json!({"error":"store unavailable"}));
+    assert_eq!(writes.get(), 0);
+    assert_eq!(response["states"]["Draft"], "failed");
+    assert_eq!(response["effectResults"][0]["error"], "store unavailable");
 }
 
 #[test]

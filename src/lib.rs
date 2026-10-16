@@ -6,6 +6,7 @@
 
 pub mod api;
 pub mod http;
+pub mod oauth;
 
 use api::{KernelApi, ServerApi};
 
@@ -320,6 +321,34 @@ pub fn frame_stream(framing: &str, key: Option<String>, chunk: &str, carry: &str
 #[wasm_bindgen(js_name = frameStreamFinish)]
 pub fn frame_stream_finish(framing: &str, key: Option<String>, carry: &str) -> Result<String, JsError> {
     http::frame_stream_finish(framing, key.as_deref(), carry).map_err(js)
+}
+
+/// The pure half of `oauth-authorize`: parse the client and options (`oauthAuthorizePlan`), then build the
+/// authorization URL from the metadata and two host-drawn random values (`oauthAuthorizeBuild`).
+#[wasm_bindgen(js_name = oauthAuthorizePlan)]
+pub fn oauth_authorize_plan(client_json: &str, options_json: &str) -> Result<String, JsError> {
+    oauth::oauth_authorize_plan(client_json, options_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = oauthAuthorizeBuild)]
+pub fn oauth_authorize_build(
+    plan_json: &str,
+    client_id: &str,
+    metadata_json: &str,
+    state_base64: &str,
+    verifier_base64: &str,
+) -> Result<String, JsError> {
+    oauth::oauth_authorize_build(plan_json, client_id, metadata_json, state_base64, verifier_base64).map_err(js)
+}
+
+#[wasm_bindgen(js_name = oauthAuthorizeMockBuild)]
+pub fn oauth_authorize_mock_build(plan_json: &str, state_base64: &str) -> Result<String, JsError> {
+    oauth::oauth_authorize_mock_build(plan_json, state_base64).map_err(js)
+}
+
+#[wasm_bindgen(js_name = oauthFailure)]
+pub fn oauth_failure(reason: &str) -> Result<String, JsError> {
+    oauth::oauth_failure(reason).map_err(js)
 }
 
 #[wasm_bindgen(js_name = httpDriverDrop)]

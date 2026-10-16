@@ -2,9 +2,8 @@
 //! strings. The core types are the wire: asks, answers, steps and the driver itself are (de)serialized as they
 //! are; this module only moves them across the boundary.
 
-use orbital_core::runtime::http_request::{self, HeldSecrets, HttpAnswer, HttpCallDriver, HttpMethod, HttpStep, StreamFraming};
-use orbital_core::Value;
-use serde::{Deserialize, Serialize};
+use orbital_core::runtime::http_request::{self, HeldSecrets, HttpAnswer, HttpCallDriver, HttpCallInput, HttpStep, StreamFraming};
+use serde::Serialize;
 use serde_json::json;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -27,16 +26,6 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> Result<T, St
 
 fn out<T: Serialize>(value: &T) -> Result<String, String> {
     serde_json::to_string(value).map_err(|e| format!("serialize: {e}"))
-}
-
-#[derive(Deserialize)]
-struct CallIn {
-    method: HttpMethod,
-    origin: String,
-    path: String,
-    request: Value,
-    #[serde(default)]
-    key: Option<String>,
 }
 
 fn progress(driver: &mut HttpCallDriver, step: &HttpStep) -> Result<String, String> {
@@ -74,11 +63,15 @@ fn revive(driver_json: &str) -> Result<HttpCallDriver, String> {
 /// Start a call (`{ method, origin, path, request, key? }`) under the program's `egress`: `{ driver, step }`,
 /// where a call that fails to parse is a finished step with `driver: null`.
 pub fn http_driver_start(call_json: &str, egress_json: &str) -> Result<String, String> {
-    let call: CallIn = parse(call_json, "call_json")?;
+    let call: HttpCallInput = parse(call_json, "call_json")?;
     let egress: Vec<String> = parse(egress_json, "egress_json")?;
-    match http_request::parse_http_call(call.method, &call.origin, &call.path, &call.request) {
+    let parsed = match call.delivery {
+        http_request::HttpDelivery::Fetch => http_request::parse_http_call(call.method, &call.origin, &call.path, &call.request),
+        http_request::HttpDelivery::Beacon => http_request::parse_beacon_call(&call.origin, &call.request),
+    };
+    match parsed {
         Ok(spec) => {
-            let (mut driver, step) = HttpCallDriver::start(spec, egress, call.key);
+            let (mut driver, step) = HttpCallDriver::start_as(spec, egress, call.key, call.now_ms, call.principal);
             progress(&mut driver, &step)
         }
         Err(refusal) => {
@@ -180,5 +173,27 @@ mod tests {
         let out = step_of(&http_driver_start(call, "[]").unwrap());
         assert!(out["driver"].is_null());
         assert_eq!(out["step"]["result"]["error"]["key"], "k");
+    }
+
+    #[test]
+    fn a_beacon_call_asks_the_host_for_the_built_request_and_settles_flat() {
+        let call = r#"{"method":"POST","origin":"https://c.example.com/e?v=1","path":"","request":{"text":"hi"},"key":"k","delivery":"beacon"}"#;
+        let started = step_of(&http_driver_start(call, r#"["https://c.example.com"]"#).unwrap());
+        let ask = &started["step"]["ask"];
+        assert_eq!(ask["kind"], "beacon");
+        assert_eq!(ask["request"]["url"], "https://c.example.com/e?v=1");
+        assert_eq!(ask["request"]["method"], "POST");
+        let driver = started["driver"].to_string();
+        let done = step_of(&http_driver_resume(&driver, r#"{"kind":"beacon","result":{"ok":{"via":"queue"}}}"#).unwrap());
+        assert_eq!(done["step"]["result"]["ok"], serde_json::json!({"sent":true,"via":"queue","status":null,"key":"k"}));
+    }
+
+    #[test]
+    fn control_a_relative_or_undeclared_beacon_never_asks_the_host() {
+        for (origin, egress) in [("/e", r#"["https://c.example.com"]"#), ("https://other.example.com/e", r#"["https://c.example.com"]"#)] {
+            let call = format!(r#"{{"method":"POST","origin":"{origin}","path":"","request":{{"text":"hi"}},"delivery":"beacon"}}"#);
+            let out = step_of(&http_driver_start(&call, egress).unwrap());
+            assert_eq!(out["step"]["result"]["error"]["kind"], "refused", "{origin}");
+        }
     }
 }
