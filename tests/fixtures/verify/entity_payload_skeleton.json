@@ -1,0 +1,203 @@
+{
+  "name": "entity-payload-skeleton-probe",
+  "version": "1.0.0",
+  "orbitals": [
+    {
+      "name": "MembershipOrbital",
+      "entity": {
+        "name": "ChannelMember",
+        "collection": "channelmembers",
+        "persistence": "persistent",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "member",
+            "type": "string",
+            "relation": {
+              "entity": "OnlineUser"
+            }
+          },
+          {
+            "name": "channelName",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "create_policy": [
+          "=",
+          [
+            "object/get",
+            "@entity",
+            "member"
+          ],
+          "@user.id"
+        ]
+      },
+      "auxiliaryEntities": [
+        {
+          "name": "OnlineUser",
+          "collection": "onlineusers",
+          "persistence": "persistent",
+          "identity": true,
+          "fields": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "role",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "traits": [
+        {
+          "name": "MembershipPersistor",
+          "linkedEntity": "ChannelMember",
+          "emits": [
+            {
+              "event": "MEMBERSHIP_CHANGED",
+              "payloadSchema": [
+                {
+                  "name": "id",
+                  "type": "string"
+                }
+              ]
+            },
+            {
+              "event": "MembershipAddFailed",
+              "payloadSchema": [
+                {
+                  "name": "error",
+                  "type": "string"
+                },
+                {
+                  "name": "code",
+                  "type": "string"
+                }
+              ]
+            }
+          ],
+          "listens": [
+            {
+              "event": "DO_ADD",
+              "triggers": "DO_ADD"
+            }
+          ],
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              }
+            ],
+            "events": [
+              {
+                "key": "DO_ADD",
+                "payloadSchema": [
+                  {
+                    "name": "data",
+                    "type": "ChannelMember",
+                    "required": true
+                  }
+                ]
+              },
+              {
+                "key": "MembershipAddFailed",
+                "payloadSchema": [
+                  {
+                    "name": "error",
+                    "type": "string"
+                  },
+                  {
+                    "name": "code",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "key": "MEMBERSHIP_CHANGED",
+                "payloadSchema": [
+                  {
+                    "name": "id",
+                    "type": "string"
+                  }
+                ]
+              }
+            ],
+            "transitions": [
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "INIT",
+                "effects": [
+                  [
+                    "fetch",
+                    "ChannelMember"
+                  ]
+                ]
+              },
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "DO_ADD",
+                "effects": [
+                  [
+                    "persist",
+                    "create",
+                    "ChannelMember",
+                    "@payload.data",
+                    {
+                      "emit": {
+                        "failure": "MembershipAddFailed",
+                        "success": "MEMBERSHIP_CHANGED"
+                      }
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "MembershipAddFailed",
+                "effects": [
+                  [
+                    "render-ui",
+                    "toast",
+                    {
+                      "type": "alert",
+                      "variant": "error",
+                      "message": "Add failed"
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "MEMBERSHIP_CHANGED"
+              }
+            ]
+          }
+        }
+      ],
+      "pages": [
+        {
+          "name": "MembershipPage",
+          "path": "/membership",
+          "traits": [
+            {
+              "ref": "MembershipPersistor"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

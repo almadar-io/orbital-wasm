@@ -370,3 +370,147 @@ pub fn install_language(bundle_json: &str) -> Result<(), String> {
     orbital_core::language_data::install_language_bundle(bundle_json)
         .map_err(|e| format!("{}: {e}", e.code()))
 }
+
+/// Plan a resolved program for a driving host: a `PlanOutcome` as JSON. A program or options that do not
+/// parse, and a trait scope naming no trait, come back as the typed `refused` outcome, never as a throw.
+pub fn verify_plan(resolved_schema_json: &str, options_json: &str) -> String {
+    use orbital_core::verify::plan_wire::{plan_program, PlanFailure, PlanOptions, PlanOutcome};
+    let outcome = match (
+        parse::<OrbitalSchema>(resolved_schema_json, "resolved schema"),
+        if options_json.is_empty() { Ok(PlanOptions::default()) } else { parse::<PlanOptions>(options_json, "options") },
+    ) {
+        (Err(message), _) => PlanOutcome::Refused { failure: PlanFailure::InvalidProgram { message } },
+        (_, Err(message)) => PlanOutcome::Refused { failure: PlanFailure::InvalidInput { message } },
+        (Ok(schema), Ok(options)) => match plan_program(&schema, &options) {
+            Ok(steps) => PlanOutcome::Planned {
+                steps,
+                config_variants: orbital_core::verify::plan_wire::plan_config_variants(&schema, &options),
+                init_credits: orbital_core::verify::plan_wire::plan_init_credits(&schema, &options),
+                emit_sweep: orbital_core::verify::flows::plan_emit_sweep(&schema, &options),
+                contract_events: orbital_core::verify::flows::plan_contract_events(&schema, &options),
+                crud_chains: orbital_core::verify::flows::plan_crud_chains(&schema, &options),
+            },
+            Err(failure) => PlanOutcome::Refused { failure },
+        },
+    };
+    serde_json::to_string(&outcome).unwrap_or_else(|e| format!("{{\"outcome\":\"refused\",\"failure\":{{\"kind\":\"invalid-input\",\"message\":\"serialize: {e}\"}}}}"))
+}
+
+/// The oracle of a planned step (`StepWire` as JSON): an `Expectation` as JSON.
+pub fn verify_expect(step_json: &str) -> Result<String, String> {
+    let step: orbital_core::verify::plan_wire::StepWire = parse(step_json, "step")?;
+    to_json(&step.expectation())
+}
+
+/// The verdict on an observed step (`Expectation` and `Observation` as JSON): a `VerdictWire` as JSON.
+pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<String, String> {
+    let expectation = parse(expectation_json, "expectation")?;
+    let observation = parse(observation_json, "observation")?;
+    to_json(&orbital_core::verify::plan_wire::judge(&expectation, &observation))
+}
+
+/// Whether the absolute `glob` matches `path`: the one-grant matcher `os/glob` filters with.
+pub fn os_glob_matches(glob: &str, path: &str) -> bool {
+    orbital_core::embed::os_glob_matches(glob, path)
+}
+
+/// Whether the Chrome match pattern `pattern` matches `url`.
+pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
+    orbital_core::embed::tab_url_matches(pattern, url)
+}
+
+/// The names of the `os/` operations whose keyed call may defer its completion, as a JSON array.
+pub fn os_deferring_ops() -> Result<String, String> {
+    orbital_core::embed::os_deferring_ops_json()
+}
+
+/// The `{ event, payload }` a deferred keyed `os/` call's outcome (`Settled`) fires on its call site, or `null`.
+pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Result<String, String> {
+    orbital_core::embed::os_completion_event_json(site_json, key, outcome_json)
+}
+
+/// Credit the failure-route steps of a walk (`CreditStep[]` as JSON): the `Credit[]` as JSON.
+pub fn verify_credit(steps_json: &str) -> Result<String, String> {
+    let steps: Vec<orbital_core::verify::plan_wire::CreditStep> = parse(steps_json, "steps")?;
+    to_json(&orbital_core::verify::plan_wire::credit_failure_routes(&steps))
+}
+
+// Expression evaluation and row access: the kernel's one evaluator over JSON strings, for hosts that bind
+// a render's expressions in one crossing. Each forwards to `orbital_core::embed::eval_wire` unchanged.
+
+/// Evaluate `expressions_json` (`SExpr[]`) against `context_json` (`EvalContextWire`): `EvalOutcomeWire[]` as JSON, in order.
+pub fn evaluate_many(context_json: &str, expressions_json: &str) -> Result<String, String> {
+    orbital_core::embed::eval_wire::evaluate_many_json(context_json, expressions_json)
+}
+
+/// Evaluate `guards_json` (`SExpr[]`) against `context_json`: `GuardOutcomeWire[]` as JSON, in order.
+pub fn evaluate_guards(context_json: &str, guards_json: &str) -> Result<String, String> {
+    orbital_core::embed::eval_wire::evaluate_guards_json(context_json, guards_json)
+}
+
+/// Evaluate one expression with its trace: an `EvalTracedWire` as JSON.
+pub fn evaluate_traced(context_json: &str, expression_json: &str) -> Result<String, String> {
+    orbital_core::embed::eval_wire::evaluate_traced_json(context_json, expression_json)
+}
+
+/// A listen route's `with` mapping (`{ field: SExpr }`, empty for none) applied to the source payload: the mapped payload as JSON.
+pub fn map_listen_payload(mapping_json: &str, payload_json: &str) -> Result<String, String> {
+    orbital_core::embed::eval_wire::map_listen_payload_json(Some(mapping_json), payload_json)
+}
+
+/// The rows (`EntityRow[]` as JSON) that pass the `@read` policy and the call-site filter (each an `SExpr` or empty).
+pub fn scope_rows(
+    bindings_json: &str,
+    rows_json: &str,
+    policy_json: &str,
+    filter_json: &str,
+    entity_type: &str,
+) -> Result<String, String> {
+    orbital_core::embed::eval_wire::scope_rows_json(
+        bindings_json,
+        rows_json,
+        Some(policy_json),
+        Some(filter_json),
+        entity_type,
+    )
+}
+
+/// Whether `row_json` may undergo `operation` (`create`, `update` or `delete`) under `policy_json` (an `SExpr` or empty): a `MutationVerdictWire` as JSON.
+pub fn check_mutation_access(
+    operation: &str,
+    bindings_json: &str,
+    row_json: &str,
+    policy_json: &str,
+    entity_type: &str,
+) -> Result<String, String> {
+    orbital_core::embed::eval_wire::check_mutation_json(
+        operation,
+        bindings_json,
+        row_json,
+        Some(policy_json),
+        entity_type,
+    )
+}
+
+/// What a binding term folds to for a row predicate: a `RowBindingWire` as JSON.
+pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, String> {
+    orbital_core::embed::eval_wire::resolve_row_binding_json(term, bindings_json)
+}
+
+/// Plan a rendered affordance the host found (`AffordanceQuery` as JSON) in a resolved program: an
+/// `AffordanceStep` as JSON, or `null` when no trait of that name exists.
+pub fn verify_affordance(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, String> {
+    let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
+    let query = parse(query_json, "query")?;
+    let options = if options_json.is_empty() { Default::default() } else { parse(options_json, "options")? };
+    to_json(&orbital_core::verify::flows::plan_affordance(&schema, &query, &options))
+}
+
+/// Plan the forced failure of a transient failure arm (`TransientQuery` as JSON): a `TransientOutcome` as JSON,
+/// or `null` when no trait of that name exists.
+pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, String> {
+    let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
+    let query = parse(query_json, "query")?;
+    let options = if options_json.is_empty() { Default::default() } else { parse(options_json, "options")? };
+    to_json(&orbital_core::verify::flows::plan_transient_probe(&schema, &query, &options))
+}

@@ -1,0 +1,62 @@
+{
+  "name": "App",
+  "orbitals": [
+    {
+      "name": "Main",
+      "entity": {
+        "name": "Job",
+        "persistence": "runtime",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          }
+        ]
+      },
+      "traits": [
+        {
+          "name": "Gauge",
+          "linkedEntity": "Job",
+          "config": {
+            "format": {
+              "type": "string",
+              "default": "hearts",
+              "values": [
+                "hearts",
+                "bar",
+                "numeric"
+              ]
+            },
+            "animated": {
+              "type": "boolean",
+              "default": true
+            },
+            "current": {
+              "type": "number",
+              "default": 0
+            },
+            "className": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              }
+            ],
+            "transitions": [
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "TICK"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

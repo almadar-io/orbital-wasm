@@ -1,0 +1,99 @@
+{
+  "name": "App",
+  "orbitals": [
+    {
+      "name": "Main",
+      "entity": {
+        "name": "Thing",
+        "persistence": "runtime",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "activeId",
+            "type": "string",
+            "default": ""
+          }
+        ]
+      },
+      "traits": [
+        {
+          "name": "Composer",
+          "linkedEntity": "Thing",
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              },
+              {
+                "name": "sent"
+              }
+            ],
+            "transitions": [
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "INIT"
+              },
+              {
+                "from": "idle",
+                "to": "sent",
+                "event": "SEND",
+                "guard": "@entity.activeId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Picker",
+          "linkedEntity": "Thing",
+          "stateMachine": {
+            "states": [
+              {
+                "name": "waiting",
+                "isInitial": true
+              },
+              {
+                "name": "picked"
+              }
+            ],
+            "events": [
+              {
+                "key": "SELECT",
+                "name": "SELECT",
+                "payloadSchema": [
+                  {
+                    "name": "id",
+                    "type": "string"
+                  }
+                ]
+              }
+            ],
+            "transitions": [
+              {
+                "from": "waiting",
+                "to": "waiting",
+                "event": "INIT"
+              },
+              {
+                "from": "waiting",
+                "to": "picked",
+                "event": "SELECT",
+                "effects": [
+                  [
+                    "set",
+                    "@entity.activeId",
+                    "@payload.id"
+                  ]
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -301,6 +301,43 @@ pub fn install_language(bundle_json: &str) -> Result<(), JsError> {
     api::install_language(bundle_json).map_err(js)
 }
 
+/// The verifier's planner: what to fire for a resolved program (`PlanOutcome` as JSON).
+#[wasm_bindgen(js_name = verifyPlan)]
+pub fn verify_plan(resolved_schema_json: &str, options_json: &str) -> String {
+    api::verify_plan(resolved_schema_json, options_json)
+}
+
+/// The oracle of one planned step (`StepWire` in, `Expectation` out, as JSON).
+#[wasm_bindgen(js_name = verifyExpect)]
+pub fn verify_expect(step_json: &str) -> Result<String, JsError> {
+    api::verify_expect(step_json).map_err(js)
+}
+
+/// The verdict on one observed step (`Expectation` and `Observation` in, `VerdictWire` out, as JSON).
+#[wasm_bindgen(js_name = verifyJudge)]
+pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<String, JsError> {
+    api::verify_judge(expectation_json, observation_json).map_err(js)
+}
+
+/// The failure-route steps of a walk credited from the hops other steps' dispatches fired
+/// (`CreditStep[]` in, `Credit[]` out, as JSON).
+#[wasm_bindgen(js_name = verifyCredit)]
+pub fn verify_credit(steps_json: &str) -> Result<String, JsError> {
+    api::verify_credit(steps_json).map_err(js)
+}
+
+/// A rendered affordance the host found, planned (`AffordanceQuery` in, `AffordanceStep` or `null` out, as JSON).
+#[wasm_bindgen(js_name = verifyAffordance)]
+pub fn verify_affordance(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
+    api::verify_affordance(resolved_schema_json, query_json, options_json).map_err(js)
+}
+
+/// The forced failure of a transient failure arm (`TransientQuery` in, `TransientOutcome` or `null` out, as JSON).
+#[wasm_bindgen(js_name = verifyTransientProbe)]
+pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
+    api::verify_transient_probe(resolved_schema_json, query_json, options_json).map_err(js)
+}
+
 /// The `http` effect's sans-I/O driver (`orbital_core::runtime::http_request`) over JSON strings; each
 /// returns what `http::*` returns, or throws a JS `Error` for a malformed argument.
 #[wasm_bindgen(js_name = httpDriverStart)]
@@ -315,25 +352,25 @@ pub fn http_driver_resume(driver_json: &str, answer_json: &str) -> Result<String
 
 #[wasm_bindgen(js_name = osGlobMatches)]
 pub fn os_glob_matches(glob: &str, path: &str) -> bool {
-    orbital_core::embed::os_glob_matches(glob, path)
+    api::os_glob_matches(glob, path)
 }
 
 /// Whether the Chrome match pattern `pattern` matches `url`.
 #[wasm_bindgen(js_name = tabUrlMatches)]
 pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
-    orbital_core::embed::tab_url_matches(pattern, url)
+    api::tab_url_matches(pattern, url)
 }
 
 /// The names of the `os/` operations whose keyed call may defer its completion, as a JSON array.
 #[wasm_bindgen(js_name = osDeferringOps)]
 pub fn os_deferring_ops() -> Result<String, JsError> {
-    orbital_core::embed::os_deferring_ops_json().map_err(js)
+    api::os_deferring_ops().map_err(js)
 }
 
 /// The `{ event, payload }` a deferred keyed `os/` call's outcome (`Settled`) fires on its call site, or `null`.
 #[wasm_bindgen(js_name = osCompletionEvent)]
 pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Result<String, JsError> {
-    orbital_core::embed::os_completion_event_json(site_json, key, outcome_json).map_err(js)
+    api::os_completion_event(site_json, key, outcome_json).map_err(js)
 }
 
 #[wasm_bindgen(js_name = isPublicAddress)]
@@ -392,4 +429,59 @@ pub fn stream_events(driver_json: &str, chunk: &str, carry: &str) -> Result<Stri
 #[wasm_bindgen(js_name = streamFinish)]
 pub fn stream_finish(driver_json: &str, carry: &str) -> Result<String, JsError> {
     http::stream_finish(driver_json, carry).map_err(js)
+}
+
+/// Evaluate `expressionsJson` (`SExpr[]`) against `contextJson` (`EvalContextWire`) in one crossing:
+/// `EvalOutcomeWire[]` as JSON, in order.
+#[wasm_bindgen(js_name = evaluateMany)]
+pub fn evaluate_many(context_json: &str, expressions_json: &str) -> Result<String, JsError> {
+    api::evaluate_many(context_json, expressions_json).map_err(js)
+}
+
+/// Every guard of a render against a context in one crossing (`GuardOutcomeWire[]` as JSON).
+#[wasm_bindgen(js_name = evaluateGuards)]
+pub fn evaluate_guards(context_json: &str, guards_json: &str) -> Result<String, JsError> {
+    api::evaluate_guards(context_json, guards_json).map_err(js)
+}
+
+/// One expression with its trace (`EvalTracedWire` as JSON).
+#[wasm_bindgen(js_name = evaluateTraced)]
+pub fn evaluate_traced(context_json: &str, expression_json: &str) -> Result<String, JsError> {
+    api::evaluate_traced(context_json, expression_json).map_err(js)
+}
+
+/// A listen route's `with` mapping applied to the source payload (the mapped payload as JSON).
+#[wasm_bindgen(js_name = mapListenPayload)]
+pub fn map_listen_payload(mapping_json: &str, payload_json: &str) -> Result<String, JsError> {
+    api::map_listen_payload(mapping_json, payload_json).map_err(js)
+}
+
+/// The rows that pass a `@read` policy and a call-site filter (each an `SExpr` as JSON, or empty).
+#[wasm_bindgen(js_name = scopeRows)]
+pub fn scope_rows(
+    bindings_json: &str,
+    rows_json: &str,
+    policy_json: &str,
+    filter_json: &str,
+    entity_type: &str,
+) -> Result<String, JsError> {
+    api::scope_rows(bindings_json, rows_json, policy_json, filter_json, entity_type).map_err(js)
+}
+
+/// Whether a row may be created, updated or deleted under a directive (`MutationVerdictWire` as JSON).
+#[wasm_bindgen(js_name = checkMutationAccess)]
+pub fn check_mutation_access(
+    operation: &str,
+    bindings_json: &str,
+    row_json: &str,
+    policy_json: &str,
+    entity_type: &str,
+) -> Result<String, JsError> {
+    api::check_mutation_access(operation, bindings_json, row_json, policy_json, entity_type).map_err(js)
+}
+
+/// What a `@user`/`@payload`/`@config`/`@now` term folds to for a row predicate (`RowBindingWire` as JSON).
+#[wasm_bindgen(js_name = resolveRowBinding)]
+pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, JsError> {
+    api::resolve_row_binding(term, bindings_json).map_err(js)
 }

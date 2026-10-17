@@ -1,0 +1,356 @@
+{
+  "outcome": "planned",
+  "steps": [
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "DONE",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "malformed",
+      "navigates": false,
+      "coverageKey": "Saver:idle+DONE->idle[malformed]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "DONE",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "state": "{\"key\":\"verify\",\"size\":1,\"isPublic\":true,\"mode\":\"single\"}"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+DONE->idle[success]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "DONE",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "state": "{\"key\":\"verify\",\"size\":1,\"isPublic\":true,\"mode\":\"verify\"}"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+DONE->idle[guard-fail]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "DONE",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": true,
+      "arm": 1,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "malformed",
+      "navigates": false,
+      "coverageKey": "Saver:idle+DONE->idle[malformed]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "DONE",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "state": "{\"key\":\"verify\",\"size\":1,\"isPublic\":true,\"mode\":\"batch\"}"
+      },
+      "guarded": true,
+      "arm": 1,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+DONE->idle[success]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "DONE",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "state": "{\"key\":\"verify\",\"size\":1,\"isPublic\":true,\"mode\":\"verify\"}"
+      },
+      "guarded": true,
+      "arm": 1,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+DONE->idle[guard-fail]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "INIT",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "Saver:idle+INIT->idle"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "LOADED",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "data": [
+          {
+            "title": "Title 1",
+            "id": "Thing-verify-seed-1"
+          }
+        ]
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+LOADED->idle[success]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "LOADED",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "data": []
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+LOADED->idle[guard-fail]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "NEXT",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "malformed",
+      "navigates": false,
+      "coverageKey": "Saver:idle+NEXT->idle[malformed]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "NEXT",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "batch": "{\"items\":[{\"name\":\"verify\"}],\"idx\":0}"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+NEXT->idle[success]"
+    },
+    {
+      "trait": "Saver",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "NEXT",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "batch": "{\"items\":[{\"name\":\"verify\"}],\"idx\":1}"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "Saver:idle+NEXT->idle[guard-fail]"
+    }
+  ],
+  "configVariants": [],
+  "initCredits": [
+    {
+      "trait": "Saver",
+      "state": "idle",
+      "coverageKey": "Saver:idle+INIT->idle"
+    }
+  ]
+}

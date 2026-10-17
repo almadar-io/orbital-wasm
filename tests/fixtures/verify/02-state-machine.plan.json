@@ -1,0 +1,612 @@
+{
+  "outcome": "planned",
+  "steps": [
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "creating",
+      "event": "CANCEL",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "CREATE",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:creating+CANCEL->listing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "creating",
+      "event": "SAVE",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "success",
+      "payload": {
+        "data": {
+          "customerName": "-other",
+          "total": 1
+        }
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "CREATE",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:creating+SAVE->listing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "creating",
+      "event": "SAVE",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "success",
+      "payload": {
+        "data": {
+          "customerName": ""
+        }
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "CREATE",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": true,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:creating+SAVE->listing[guard-fail]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "editing",
+      "event": "CANCEL",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        },
+        {
+          "event": "EDIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:editing+CANCEL->viewing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "editing",
+      "event": "SAVE",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        },
+        {
+          "event": "EDIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:editing+SAVE->viewing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "listing",
+      "event": "CREATE",
+      "to": "creating",
+      "toStates": [
+        "creating"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:listing+CREATE->creating[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "listing",
+      "event": "INIT",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:listing+INIT->listing"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "listing",
+      "event": "VIEW",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:listing+VIEW->viewing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "BACK",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+BACK->listing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "CANCEL",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+CANCEL->listing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "CANCEL",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+CANCEL->listing[guard-fail]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "DELIVER",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status"
+        ]
+      },
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+DELIVER->viewing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "DELIVER",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+DELIVER->viewing[guard-fail]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "EDIT",
+      "to": "editing",
+      "toStates": [
+        "editing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+EDIT->editing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "EDIT",
+      "to": "editing",
+      "toStates": [
+        "editing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+EDIT->editing[guard-fail]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "PROCESS",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status"
+        ]
+      },
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+PROCESS->viewing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "PROCESS",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+PROCESS->viewing[guard-fail]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "SHIP",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status"
+        ]
+      },
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+SHIP->viewing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "SHIP",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {
+        "trackingNumber": ""
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+SHIP->viewing[guard-fail]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "SUBMIT",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+SUBMIT->viewing[success]"
+    },
+    {
+      "trait": "OrderLifecycle",
+      "linkedEntity": "Order",
+      "instanceId": "Order-verify-seed-1",
+      "seedRowId": "Order-verify-seed-1",
+      "from": "viewing",
+      "event": "SUBMIT",
+      "to": "viewing",
+      "toStates": [
+        "viewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "VIEW",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "OrderLifecycle:viewing+SUBMIT->viewing[guard-fail]"
+    }
+  ],
+  "configVariants": [],
+  "initCredits": [
+    {
+      "trait": "OrderLifecycle",
+      "state": "listing",
+      "coverageKey": "OrderLifecycle:listing+INIT->listing"
+    }
+  ]
+}

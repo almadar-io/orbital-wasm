@@ -1,0 +1,153 @@
+{
+  "outcome": "planned",
+  "steps": [
+    {
+      "trait": "Composer",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "INIT",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "Composer:idle+INIT->idle"
+    },
+    {
+      "trait": "Composer",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "SEND",
+      "to": "sent",
+      "toStates": [
+        "sent"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "precondition": {
+        "kind": "established",
+        "trait": "Picker",
+        "event": "SELECT",
+        "payload": {
+          "id": "Thing-verify-seed-1"
+        },
+        "establishAtState": "waiting",
+        "proof": {
+          "kind": "proven"
+        }
+      },
+      "navigates": false,
+      "coverageKey": "Composer:idle+SEND->sent[success]"
+    },
+    {
+      "trait": "Composer",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "idle",
+      "event": "SEND",
+      "to": "sent",
+      "toStates": [
+        "sent"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "Composer:idle+SEND->sent[guard-fail]"
+    },
+    {
+      "trait": "Picker",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "waiting",
+      "event": "INIT",
+      "to": "waiting",
+      "toStates": [
+        "waiting"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "Picker:waiting+INIT->waiting"
+    },
+    {
+      "trait": "Picker",
+      "linkedEntity": "Thing",
+      "instanceId": "Thing-verify-seed-1",
+      "seedRowId": "Thing-verify-seed-1",
+      "from": "waiting",
+      "event": "SELECT",
+      "to": "picked",
+      "toStates": [
+        "picked"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "id": "Thing-verify-seed-1"
+      },
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "INIT",
+          "payload": {}
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "Picker:waiting+SELECT->picked[success]"
+    }
+  ],
+  "configVariants": [],
+  "initCredits": [
+    {
+      "trait": "Composer",
+      "state": "idle",
+      "coverageKey": "Composer:idle+INIT->idle"
+    },
+    {
+      "trait": "Picker",
+      "state": "waiting",
+      "coverageKey": "Picker:waiting+INIT->waiting"
+    }
+  ]
+}
