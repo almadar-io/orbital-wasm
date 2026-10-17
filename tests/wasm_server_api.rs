@@ -156,3 +156,29 @@ fn the_tick_mount_is_set_by_json_and_a_bad_list_is_refused() {
     let err = api.set_tick_mount("not json").unwrap_err();
     assert_eq!(api.last_error(), err);
 }
+
+#[test]
+fn os_allows_answers_the_programs_grants_and_a_control_is_refused() {
+    let mut program = schema();
+    program["osGrants"] = json!({ "exec": ["git"], "fs": [{ "glob": "/data/**", "modes": ["read"] }] });
+    let api = ServerApi::new(&program.to_string()).unwrap();
+    let allows = |need: Value| api.os_allows(&need.to_string());
+    assert_eq!(allows(json!({"need":"exec","command":"git"})), Ok(true));
+    assert_eq!(allows(json!({"need":"exec","command":"rm"})), Ok(false));
+    assert_eq!(allows(json!({"need":"fs","path":"/data/a/b","mode":"read"})), Ok(true));
+    assert_eq!(allows(json!({"need":"fs","path":"/data/a","mode":"write"})), Ok(false));
+    assert_eq!(allows(json!({"need":"fs","path":"/data/../etc","mode":"read"})), Ok(false));
+    assert!(allows(json!({"need":"nope"})).is_err());
+    assert!(orbital_core::embed::os_glob_matches("/data/**", "/data/x/y"));
+    assert!(!orbital_core::embed::os_glob_matches("/data/*", "/data/x/y"));
+}
+
+#[test]
+fn a_browser_host_matches_tab_urls_with_the_kernels_one_rule() {
+    use orbital_core::embed::tab_url_matches;
+    assert!(tab_url_matches("https://*.example.com/*", "https://www.example.com/a?b=1"));
+    assert!(tab_url_matches("<all_urls>", "https://anything.test/"));
+    assert!(!tab_url_matches("https://example.com/*", "http://example.com/"));
+    assert!(!tab_url_matches("https://*.example.com/*", "https://badexample.com/"));
+    assert!(!tab_url_matches("not a pattern", "https://example.com/"));
+}

@@ -266,6 +266,11 @@ impl ServerApi {
         result
     }
 
+    /// Whether the program's `os/` grants cover `requirement_json` (an `OsRequirement`).
+    pub fn os_allows(&self, requirement_json: &str) -> Result<bool, String> {
+        self.record(self.embedded.os_allows_json(requirement_json))
+    }
+
     /// Start a request against `orbital`; a `ServerProgressWire` as JSON.
     pub fn start(&self, orbital: &str, request_json: &str) -> Result<String, String> {
         self.record(self.embedded.start_json(orbital, request_json))

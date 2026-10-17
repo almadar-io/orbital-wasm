@@ -210,6 +210,11 @@ impl Server {
             .map_err(js)
     }
 
+    #[wasm_bindgen(js_name = osAllows)]
+    pub fn os_allows(&self, requirement_json: &str) -> Result<bool, JsError> {
+        self.api.os_allows(requirement_json).map_err(js)
+    }
+
     pub fn start(&self, orbital: &str, request_json: &str) -> Result<String, JsError> {
         self.api.start(orbital, request_json).map_err(js)
     }
@@ -306,6 +311,29 @@ pub fn http_driver_start(call_json: &str, egress_json: &str) -> Result<String, J
 #[wasm_bindgen(js_name = httpDriverResume)]
 pub fn http_driver_resume(driver_json: &str, answer_json: &str) -> Result<String, JsError> {
     http::http_driver_resume(driver_json, answer_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = osGlobMatches)]
+pub fn os_glob_matches(glob: &str, path: &str) -> bool {
+    orbital_core::embed::os_glob_matches(glob, path)
+}
+
+/// Whether the Chrome match pattern `pattern` matches `url`.
+#[wasm_bindgen(js_name = tabUrlMatches)]
+pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
+    orbital_core::embed::tab_url_matches(pattern, url)
+}
+
+/// The names of the `os/` operations whose keyed call may defer its completion, as a JSON array.
+#[wasm_bindgen(js_name = osDeferringOps)]
+pub fn os_deferring_ops() -> Result<String, JsError> {
+    orbital_core::embed::os_deferring_ops_json().map_err(js)
+}
+
+/// The `{ event, payload }` a deferred keyed `os/` call's outcome (`Settled`) fires on its call site, or `null`.
+#[wasm_bindgen(js_name = osCompletionEvent)]
+pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Result<String, JsError> {
+    orbital_core::embed::os_completion_event_json(site_json, key, outcome_json).map_err(js)
 }
 
 #[wasm_bindgen(js_name = isPublicAddress)]
