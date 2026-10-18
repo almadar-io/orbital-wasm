@@ -1,0 +1,357 @@
+{
+  "name": "flows",
+  "orbitals": [
+    {
+      "name": "Main",
+      "entity": {
+        "name": "Note",
+        "persistence": "runtime",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "parentId",
+            "type": "relation",
+            "relation": {
+              "entity": "Note",
+              "cardinality": "many-to-one"
+            }
+          }
+        ],
+        "create_policy": [
+          "=",
+          "@user.role",
+          "admin"
+        ]
+      },
+      "auxiliaryEntities": [
+        {
+          "name": "Member",
+          "persistence": "runtime",
+          "identity": true,
+          "fields": [
+            {
+              "name": "id",
+              "type": "string"
+            },
+            {
+              "name": "role",
+              "type": "enum",
+              "values": [
+                "admin",
+                "viewer"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Comment",
+          "persistence": "runtime",
+          "fields": [
+            {
+              "name": "id",
+              "type": "string"
+            },
+            {
+              "name": "noteId",
+              "type": "relation",
+              "relation": {
+                "entity": "Note",
+                "cardinality": "many-to-one"
+              }
+            }
+          ]
+        }
+      ],
+      "traits": [
+        {
+          "name": "Flow",
+          "linkedEntity": "Note",
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              },
+              {
+                "name": "saving"
+              },
+              {
+                "name": "saved"
+              },
+              {
+                "name": "failed"
+              }
+            ],
+            "events": [
+              {
+                "key": "DONE",
+                "name": "DONE",
+                "payloadSchema": [
+                  {
+                    "name": "count",
+                    "type": "number"
+                  }
+                ]
+              }
+            ],
+            "transitions": [
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "INIT"
+              },
+              {
+                "from": "idle",
+                "to": "saving",
+                "event": "START",
+                "effects": [
+                  [
+                    "persist",
+                    "create",
+                    "Note",
+                    {
+                      "title": "x"
+                    },
+                    {
+                      "emit": {
+                        "success": "DONE",
+                        "failure": "FAILED"
+                      }
+                    }
+                  ],
+                  [
+                    "render-ui",
+                    "main",
+                    {
+                      "type": "data-grid",
+                      "entity": "Note",
+                      "children": [
+                        {
+                          "type": "button",
+                          "action": "START"
+                        }
+                      ]
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "saving",
+                "to": "saved",
+                "event": "DONE"
+              },
+              {
+                "from": "saving",
+                "to": "failed",
+                "event": "FAILED"
+              },
+              {
+                "from": "saved",
+                "to": "idle",
+                "event": "LEAVE",
+                "effects": [
+                  [
+                    "navigate",
+                    "/away"
+                  ]
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Notes",
+          "linkedEntity": "Note",
+          "listens": [
+            {
+              "event": "NOTE_SAVE",
+              "triggers": "DO_CREATE",
+              "source": {
+                "kind": "trait",
+                "trait": "NoteModal"
+              }
+            },
+            {
+              "event": "CONFIRM_DELETE",
+              "triggers": "DO_DELETE",
+              "source": {
+                "kind": "trait",
+                "trait": "NoteConfirm"
+              }
+            }
+          ],
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              }
+            ],
+            "transitions": [
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "INIT"
+              },
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "DO_CREATE",
+                "effects": [
+                  [
+                    "persist",
+                    "create",
+                    "Note",
+                    "@payload.data",
+                    {
+                      "emit": {
+                        "success": "NOTE_CREATED"
+                      }
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "DO_DELETE",
+                "effects": [
+                  [
+                    "persist",
+                    "delete",
+                    "Note",
+                    "@payload.id",
+                    {
+                      "emit": {
+                        "success": "NOTE_DELETED"
+                      }
+                    }
+                  ]
+                ]
+              }
+            ],
+            "events": []
+          }
+        },
+        {
+          "name": "NoteModal",
+          "linkedEntity": "Note",
+          "stateMachine": {
+            "states": [
+              {
+                "name": "closed",
+                "isInitial": true
+              },
+              {
+                "name": "open"
+              }
+            ],
+            "transitions": [
+              {
+                "from": "closed",
+                "to": "open",
+                "event": "OPEN",
+                "effects": [
+                  [
+                    "render-ui",
+                    "modal",
+                    {
+                      "type": "form-section",
+                      "submitEvent": "NOTE_SAVE",
+                      "fields": [
+                        "title"
+                      ]
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "open",
+                "to": "closed",
+                "event": "NOTE_SAVE"
+              }
+            ],
+            "events": []
+          }
+        },
+        {
+          "name": "NoteConfirm",
+          "linkedEntity": "Note",
+          "listens": [
+            {
+              "event": "REQUEST_DELETE",
+              "triggers": "ASK",
+              "source": {
+                "kind": "trait",
+                "trait": "NoteBrowse"
+              }
+            }
+          ],
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              },
+              {
+                "name": "confirming"
+              }
+            ],
+            "events": [
+              {
+                "key": "ASK",
+                "name": "ASK",
+                "payloadSchema": [
+                  {
+                    "name": "id",
+                    "type": "string",
+                    "required": true
+                  },
+                  {
+                    "name": "row",
+                    "type": "object",
+                    "entity": "Note"
+                  }
+                ]
+              }
+            ],
+            "transitions": [
+              {
+                "from": "idle",
+                "to": "confirming",
+                "event": "ASK",
+                "effects": [
+                  [
+                    "render-ui",
+                    "modal",
+                    {
+                      "type": "confirm-dialog",
+                      "children": [
+                        {
+                          "type": "button",
+                          "action": "CONFIRM_DELETE"
+                        }
+                      ]
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "confirming",
+                "to": "idle",
+                "event": "CONFIRM_DELETE"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 pub mod api;
 pub mod http;
 pub mod oauth;
+pub mod stored;
 
 use api::{KernelApi, ServerApi};
 
@@ -336,6 +337,12 @@ pub fn verify_affordance(resolved_schema_json: &str, query_json: &str, options_j
 #[wasm_bindgen(js_name = verifyTransientProbe)]
 pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
     api::verify_transient_probe(resolved_schema_json, query_json, options_json).map_err(js)
+}
+
+/// The hops that place a fresh machine in a state (`ReplayQuery` in, `PreambleEvent[]` or `null` out, as JSON).
+#[wasm_bindgen(js_name = verifyReplay)]
+pub fn verify_replay(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
+    api::verify_replay(resolved_schema_json, query_json, options_json).map_err(js)
 }
 
 /// The `http` effect's sans-I/O driver (`orbital_core::runtime::http_request`) over JSON strings; each

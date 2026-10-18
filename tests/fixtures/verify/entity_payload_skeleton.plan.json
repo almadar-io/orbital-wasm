@@ -7,6 +7,26 @@
       "instanceId": "ChannelMember-verify-seed-1",
       "seedRowId": "ChannelMember-verify-seed-1",
       "from": "idle",
+      "event": "INIT",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "MembershipPersistor:idle+INIT->idle"
+    },
+    {
+      "trait": "MembershipPersistor",
+      "linkedEntity": "ChannelMember",
+      "instanceId": "ChannelMember-verify-seed-1",
+      "seedRowId": "ChannelMember-verify-seed-1",
+      "from": "idle",
       "event": "DO_ADD",
       "to": "idle",
       "toStates": [
@@ -16,12 +36,7 @@
       "payload": {},
       "guarded": false,
       "solved": true,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
+      "preamble": [],
       "payloadCase": "malformed",
       "navigates": false,
       "coverageKey": "MembershipPersistor:idle+DO_ADD->idle[malformed]"
@@ -47,62 +62,10 @@
       },
       "guarded": false,
       "solved": true,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
-      "payloadCase": "success",
-      "navigates": false,
-      "coverageKey": "MembershipPersistor:idle+DO_ADD->idle[success]"
-    },
-    {
-      "trait": "MembershipPersistor",
-      "linkedEntity": "ChannelMember",
-      "instanceId": "ChannelMember-verify-seed-1",
-      "seedRowId": "ChannelMember-verify-seed-1",
-      "from": "idle",
-      "event": "INIT",
-      "to": "idle",
-      "toStates": [
-        "idle"
-      ],
-      "variant": "auto-init",
-      "payload": {},
-      "guarded": false,
-      "solved": true,
       "preamble": [],
       "payloadCase": "success",
       "navigates": false,
-      "coverageKey": "MembershipPersistor:idle+INIT->idle"
-    },
-    {
-      "trait": "MembershipPersistor",
-      "linkedEntity": "ChannelMember",
-      "instanceId": "ChannelMember-verify-seed-1",
-      "seedRowId": "ChannelMember-verify-seed-1",
-      "from": "idle",
-      "event": "MEMBERSHIP_CHANGED",
-      "to": "idle",
-      "toStates": [
-        "idle"
-      ],
-      "variant": "auto-init",
-      "payload": {
-        "id": "ChannelMember-verify-seed-1"
-      },
-      "guarded": false,
-      "solved": true,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
-      "payloadCase": "success",
-      "navigates": false,
-      "coverageKey": "MembershipPersistor:idle+MEMBERSHIP_CHANGED->idle[success]"
+      "coverageKey": "MembershipPersistor:idle+DO_ADD->idle[success]"
     },
     {
       "trait": "MembershipPersistor",
@@ -122,15 +85,32 @@
       },
       "guarded": false,
       "solved": true,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
+      "preamble": [],
       "payloadCase": "success",
       "navigates": false,
       "coverageKey": "MembershipPersistor:idle+MembershipAddFailed->idle[success]"
+    },
+    {
+      "trait": "MembershipPersistor",
+      "linkedEntity": "ChannelMember",
+      "instanceId": "ChannelMember-verify-seed-1",
+      "seedRowId": "ChannelMember-verify-seed-1",
+      "from": "idle",
+      "event": "MEMBERSHIP_CHANGED",
+      "to": "idle",
+      "toStates": [
+        "idle"
+      ],
+      "variant": "auto-init",
+      "payload": {
+        "id": "ChannelMember-verify-seed-1"
+      },
+      "guarded": false,
+      "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "MembershipPersistor:idle+MEMBERSHIP_CHANGED->idle[success]"
     }
   ],
   "configVariants": [],
@@ -140,5 +120,58 @@
       "state": "idle",
       "coverageKey": "MembershipPersistor:idle+INIT->idle"
     }
-  ]
+  ],
+  "emitSweep": [
+    {
+      "trait": "MembershipPersistor",
+      "from": "idle",
+      "event": "MembershipAddFailed",
+      "payload": {
+        "error": "verify",
+        "code": "verify"
+      },
+      "navigates": false,
+      "coverageKey": "MembershipPersistor:idle+MembershipAddFailed->idle[emit]"
+    },
+    {
+      "trait": "MembershipPersistor",
+      "from": "idle",
+      "event": "MEMBERSHIP_CHANGED",
+      "payload": {
+        "id": "ChannelMember-verify-seed-1"
+      },
+      "navigates": false,
+      "coverageKey": "MembershipPersistor:idle+MEMBERSHIP_CHANGED->idle[emit]"
+    }
+  ],
+  "dataMutations": [
+    {
+      "trait": "MembershipPersistor",
+      "from": "idle",
+      "event": "DO_ADD",
+      "to": "idle",
+      "payload": {
+        "data": {
+          "member": "Member 1",
+          "channelName": "Channel Name 1",
+          "id": "ChannelMember-verify-new-1"
+        }
+      },
+      "entity": "ChannelMember",
+      "kind": "create",
+      "rowDelta": 1,
+      "successEvent": "MEMBERSHIP_CHANGED",
+      "viewer": {
+        "owner": {
+          "sourceEntity": "OnlineUser",
+          "sourceField": "id",
+          "useDefaultId": true,
+          "payloadOwnerField": "member"
+        }
+      },
+      "coverageKey": "MembershipPersistor:idle+DO_ADD->idle[data-mutation:create]"
+    }
+  ],
+  "crudChains": [],
+  "tickSteps": []
 }

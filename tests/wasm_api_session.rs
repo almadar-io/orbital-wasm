@@ -5,7 +5,7 @@ use orbital_core::planner;
 use orbital_core::OrbitalSchema;
 use orbital_wasm::api::{
     check_mutation_access, evaluate_guards, evaluate_many, evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows,
-    verify_credit, verify_expect, verify_judge, verify_plan, KernelApi,
+    verify_affordance, verify_credit, verify_expect, verify_judge, verify_plan, verify_replay, verify_transient_probe, KernelApi,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -166,7 +166,8 @@ fn native_plan(schema: &OrbitalSchema) -> Vec<Value> {
     for td in planner::inline_traits(schema) {
         let seed_id = td.linked_entity.as_deref().map(|e| planner::effective_seed_id(e, &owner_fields, None));
         for step in planner::plan_trait(td, &ctx, seed_id.as_deref()) {
-            let preamble = planner::replay_path(td, &step.from, &ctx, seed_id.as_deref());
+            let preamble = planner::replay_steps(td, &step.from, &ctx, seed_id.as_deref())
+                .map(|hops| hops.into_iter().map(|h| (h.event, h.payload)).collect::<Vec<_>>());
             out.push(json!({
                 "trait": step.trait_name, "from": step.from, "event": step.event, "to": step.to,
                 "toStates": step.to_states, "variant": step.variant, "payload": step.payload,
@@ -188,7 +189,7 @@ fn exported_plan(text: &str) -> Vec<Value> {
             "toStates": s["toStates"], "variant": s["variant"], "payload": s["payload"],
             "guarded": s["guarded"], "arm": s.get("arm").cloned().unwrap_or(Value::Null), "solved": s["solved"],
             "reply": s.get("reply").cloned().unwrap_or(Value::Null),
-            "preambleEvents": if skip_init { Value::Null } else { s.get("preamble").cloned().unwrap_or(Value::Null) },
+            "preambleEvents": if skip_init { Value::Null } else { s.get("preamble").map_or(Value::Null, |hops| Value::Array(hops.as_array().unwrap().iter().map(|h| json!({ "event": h["event"], "payload": h["payload"] })).collect())) },
         })
     }).collect()
 }
@@ -202,7 +203,8 @@ fn the_exported_plan_is_the_native_plan_on_three_verify_fixtures() {
         assert!(!native.is_empty(), "{name} plans no step");
         assert_eq!(exported_plan(&text), native, "{name}");
         let golden_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/fixtures/verify/{name}.plan.json"));
-        let full = parsed(&verify_plan(&text, ""));
+        let mut full = parsed(&verify_plan(&text, ""));
+        full.as_object_mut().unwrap().remove("contractEvents");
         if std::env::var("VERIFY_PLAN_GOLDEN_WRITE").as_deref() == Ok("1") {
             std::fs::write(&golden_path, serde_json::to_string_pretty(&full).unwrap() + "\n").unwrap();
         }
@@ -681,6 +683,8 @@ fn the_flow_planners_are_exported_with_the_plan_and_as_host_queries() {
     assert_eq!(plan["contractEvents"]["available"], true);
     assert!(plan["contractEvents"]["steps"].is_array());
     assert!(plan["crudChains"].is_array());
+    assert!(plan["tickSteps"].is_array() && plan["dataMutations"].is_array());
+    assert_eq!(plan["dataMutations"][0]["coverageKey"], "Flow:idle+START->saving[data-mutation:create]");
     let go = parsed(&verify_affordance(&text, r#"{"trait":"Flow","from":"idle","event":"START"}"#, "").unwrap());
     assert_eq!((go["to"].as_str(), go["declared"].as_bool()), (Some("saving"), Some(true)));
     assert_eq!(parsed(&verify_affordance(&text, r#"{"trait":"Nobody","from":"idle","event":"START"}"#, "").unwrap()), Value::Null);
@@ -688,4 +692,20 @@ fn the_flow_planners_are_exported_with_the_plan_and_as_host_queries() {
     assert_eq!(probe["outcome"], "probe");
     assert_eq!(probe["step"]["role"], json!({ "field": "role", "value": "viewer" }));
     assert!(verify_affordance(&text, "{not json", "").is_err());
+}
+
+#[test]
+fn an_exported_replay_places_a_fresh_machine_in_a_state_or_says_it_cannot() {
+    let program = json!({
+        "name": "App",
+        "orbitals": [{ "name": "Main",
+            "entity": { "name": "Job", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [{ "name": "Flow", "linkedEntity": "Job",
+                "stateMachine": { "states": [{ "name": "idle", "isInitial": true }, { "name": "busy" }],
+                    "transitions": [{ "from": "idle", "to": "busy", "event": "GO" }] } }] }]
+    })
+    .to_string();
+    let hops = parsed(&verify_replay(&program, r#"{"trait":"Flow","state":"busy"}"#, "").unwrap());
+    assert_eq!((hops[0]["event"].as_str(), hops[0]["from"].as_str(), hops[0]["to"].as_str()), (Some("GO"), Some("idle"), Some("busy")));
+    assert_eq!(parsed(&verify_replay(&program, r#"{"trait":"Flow","state":"gone"}"#, "").unwrap()), Value::Null);
 }

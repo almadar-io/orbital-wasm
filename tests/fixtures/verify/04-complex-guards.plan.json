@@ -6,25 +6,40 @@
       "linkedEntity": "LoanApplication",
       "instanceId": "LoanApplication-verify-seed-1",
       "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "creating",
-      "event": "BACK",
+      "from": "listing",
+      "event": "INIT",
       "to": "listing",
       "toStates": [
         "listing"
       ],
-      "variant": "success",
+      "variant": "auto-init",
       "payload": {},
       "guarded": false,
       "solved": true,
-      "preamble": [
-        {
-          "event": "CREATE",
-          "payload": {}
-        }
-      ],
+      "preamble": [],
       "payloadCase": "success",
       "navigates": false,
-      "coverageKey": "LoanProcessing:creating+BACK->listing[success]"
+      "coverageKey": "LoanProcessing:listing+INIT->listing"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "listing",
+      "event": "CREATE",
+      "to": "creating",
+      "toStates": [
+        "creating"
+      ],
+      "variant": "auto-init",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "LoanProcessing:listing+CREATE->creating[success]"
     },
     {
       "trait": "LoanProcessing",
@@ -55,7 +70,10 @@
       "preamble": [
         {
           "event": "CREATE",
-          "payload": {}
+          "payload": {},
+          "from": "listing",
+          "to": "creating",
+          "navigates": false
         }
       ],
       "payloadCase": "success",
@@ -89,7 +107,10 @@
       "preamble": [
         {
           "event": "CREATE",
-          "payload": {}
+          "payload": {},
+          "from": "listing",
+          "to": "creating",
+          "navigates": false
         }
       ],
       "payloadCase": "guard-fail",
@@ -103,200 +124,28 @@
       "linkedEntity": "LoanApplication",
       "instanceId": "LoanApplication-verify-seed-1",
       "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "deciding",
+      "from": "creating",
       "event": "BACK",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {},
-      "guarded": false,
-      "solved": true,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        },
-        {
-          "event": "MANUAL_APPROVE",
-          "payload": {}
-        }
-      ],
-      "payloadCase": "success",
-      "navigates": false,
-      "coverageKey": "LoanProcessing:deciding+BACK->reviewing[success]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "deciding",
-      "event": "CANCEL",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {},
-      "guarded": false,
-      "solved": true,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        },
-        {
-          "event": "MANUAL_APPROVE",
-          "payload": {}
-        }
-      ],
-      "payloadCase": "success",
-      "navigates": false,
-      "coverageKey": "LoanProcessing:deciding+CANCEL->reviewing[success]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "deciding",
-      "event": "SAVE",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {
-        "data": {
-          "id": "LoanApplication-verify-seed-1"
-        },
-        "id": "LoanApplication-verify-seed-1"
-      },
-      "guarded": true,
-      "arm": 0,
-      "solved": false,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        },
-        {
-          "event": "MANUAL_APPROVE",
-          "payload": {}
-        }
-      ],
-      "payloadCase": "success",
-      "guardCase": "pass",
-      "guardSteerable": false,
-      "precondition": {
-        "kind": "unreachable",
-        "fields": [
-          "requestedAmount"
-        ]
-      },
-      "navigates": false,
-      "coverageKey": "LoanProcessing:deciding+SAVE->reviewing[success]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "deciding",
-      "event": "SAVE",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {
-        "data": {
-          "id": "LoanApplication-verify-seed-1",
-          "approvedAmount": 0
-        },
-        "id": "LoanApplication-verify-seed-1"
-      },
-      "guarded": true,
-      "arm": 0,
-      "solved": true,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        },
-        {
-          "event": "MANUAL_APPROVE",
-          "payload": {}
-        }
-      ],
-      "payloadCase": "guard-fail",
-      "guardCase": "fail",
-      "guardSteerable": false,
-      "navigates": false,
-      "coverageKey": "LoanProcessing:deciding+SAVE->reviewing[guard-fail]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "listing",
-      "event": "CREATE",
-      "to": "creating",
-      "toStates": [
-        "creating"
-      ],
-      "variant": "auto-init",
-      "payload": {},
-      "guarded": false,
-      "solved": true,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
-      "payloadCase": "success",
-      "navigates": false,
-      "coverageKey": "LoanProcessing:listing+CREATE->creating[success]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "listing",
-      "event": "INIT",
       "to": "listing",
       "toStates": [
         "listing"
       ],
-      "variant": "auto-init",
+      "variant": "success",
       "payload": {},
       "guarded": false,
       "solved": true,
-      "preamble": [],
+      "preamble": [
+        {
+          "event": "CREATE",
+          "payload": {},
+          "from": "listing",
+          "to": "creating",
+          "navigates": false
+        }
+      ],
       "payloadCase": "success",
       "navigates": false,
-      "coverageKey": "LoanProcessing:listing+INIT->listing"
+      "coverageKey": "LoanProcessing:creating+BACK->listing[success]"
     },
     {
       "trait": "LoanProcessing",
@@ -317,15 +166,116 @@
       },
       "guarded": false,
       "solved": true,
+      "preamble": [],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "LoanProcessing:listing+REVIEW->reviewing[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "reviewing",
+      "event": "BACK",
+      "to": "listing",
+      "toStates": [
+        "listing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
       "preamble": [
         {
-          "event": "INIT",
-          "payload": {}
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "success",
       "navigates": false,
-      "coverageKey": "LoanProcessing:listing+REVIEW->reviewing[success]"
+      "coverageKey": "LoanProcessing:reviewing+BACK->listing[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "reviewing",
+      "event": "SUBMIT",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
+      ],
+      "variant": "success",
+      "payload": {
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "LoanProcessing:reviewing+SUBMIT->reviewing[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "reviewing",
+      "event": "SUBMIT",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
+      ],
+      "variant": "success",
+      "payload": {
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "LoanProcessing:reviewing+SUBMIT->reviewing[guard-fail]"
     },
     {
       "trait": "LoanProcessing",
@@ -352,7 +302,10 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "success",
@@ -397,7 +350,10 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "guard-fail",
@@ -431,7 +387,10 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "success",
@@ -475,7 +434,10 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "guard-fail",
@@ -490,10 +452,189 @@
       "instanceId": "LoanApplication-verify-seed-1",
       "seedRowId": "LoanApplication-verify-seed-1",
       "from": "reviewing",
-      "event": "BACK",
-      "to": "listing",
+      "event": "MANUAL_APPROVE",
+      "to": "deciding",
       "toStates": [
-        "listing"
+        "deciding"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status",
+          "creditScore",
+          "employmentYears"
+        ]
+      },
+      "navigates": false,
+      "coverageKey": "LoanProcessing:reviewing+MANUAL_APPROVE->deciding[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "reviewing",
+      "event": "MANUAL_APPROVE",
+      "to": "deciding",
+      "toStates": [
+        "deciding"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "LoanProcessing:reviewing+MANUAL_APPROVE->deciding[guard-fail]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "deciding",
+      "event": "SAVE",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
+      ],
+      "variant": "success",
+      "payload": {
+        "data": {
+          "id": "LoanApplication-verify-seed-1"
+        },
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        },
+        {
+          "event": "MANUAL_APPROVE",
+          "payload": {},
+          "from": "reviewing",
+          "to": "deciding",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "requestedAmount"
+        ]
+      },
+      "navigates": false,
+      "coverageKey": "LoanProcessing:deciding+SAVE->reviewing[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "deciding",
+      "event": "SAVE",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
+      ],
+      "variant": "success",
+      "payload": {
+        "data": {
+          "id": "LoanApplication-verify-seed-1",
+          "approvedAmount": 0
+        },
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "guarded": true,
+      "arm": 0,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        },
+        {
+          "event": "MANUAL_APPROVE",
+          "payload": {},
+          "from": "reviewing",
+          "to": "deciding",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "LoanProcessing:deciding+SAVE->reviewing[guard-fail]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "deciding",
+      "event": "CANCEL",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
       ],
       "variant": "success",
       "payload": {},
@@ -506,12 +647,137 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        },
+        {
+          "event": "MANUAL_APPROVE",
+          "payload": {},
+          "from": "reviewing",
+          "to": "deciding",
+          "navigates": false
         }
       ],
       "payloadCase": "success",
       "navigates": false,
-      "coverageKey": "LoanProcessing:reviewing+BACK->listing[success]"
+      "coverageKey": "LoanProcessing:deciding+CANCEL->reviewing[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "deciding",
+      "event": "BACK",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": false,
+      "solved": true,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        },
+        {
+          "event": "MANUAL_APPROVE",
+          "payload": {},
+          "from": "reviewing",
+          "to": "deciding",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "success",
+      "navigates": false,
+      "coverageKey": "LoanProcessing:deciding+BACK->reviewing[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "reviewing",
+      "event": "MANUAL_REJECT",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "success",
+      "guardCase": "pass",
+      "guardSteerable": false,
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status"
+        ]
+      },
+      "navigates": false,
+      "coverageKey": "LoanProcessing:reviewing+MANUAL_REJECT->reviewing[success]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "linkedEntity": "LoanApplication",
+      "instanceId": "LoanApplication-verify-seed-1",
+      "seedRowId": "LoanApplication-verify-seed-1",
+      "from": "reviewing",
+      "event": "MANUAL_REJECT",
+      "to": "reviewing",
+      "toStates": [
+        "reviewing"
+      ],
+      "variant": "success",
+      "payload": {},
+      "guarded": true,
+      "arm": 0,
+      "solved": false,
+      "preamble": [
+        {
+          "event": "REVIEW",
+          "payload": {
+            "row": {
+              "id": "LoanApplication-verify-seed-1"
+            }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
+        }
+      ],
+      "payloadCase": "guard-fail",
+      "guardCase": "fail",
+      "guardSteerable": false,
+      "navigates": false,
+      "coverageKey": "LoanProcessing:reviewing+MANUAL_REJECT->reviewing[guard-fail]"
     },
     {
       "trait": "LoanProcessing",
@@ -535,7 +801,10 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "success",
@@ -567,7 +836,10 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "success",
@@ -608,7 +880,10 @@
             "row": {
               "id": "LoanApplication-verify-seed-1"
             }
-          }
+          },
+          "from": "listing",
+          "to": "reviewing",
+          "navigates": false
         }
       ],
       "payloadCase": "guard-fail",
@@ -616,216 +891,6 @@
       "guardSteerable": false,
       "navigates": false,
       "coverageKey": "LoanProcessing:reviewing+DISBURSE->reviewing[guard-fail]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "reviewing",
-      "event": "MANUAL_APPROVE",
-      "to": "deciding",
-      "toStates": [
-        "deciding"
-      ],
-      "variant": "success",
-      "payload": {},
-      "guarded": true,
-      "arm": 0,
-      "solved": false,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        }
-      ],
-      "payloadCase": "success",
-      "guardCase": "pass",
-      "guardSteerable": false,
-      "precondition": {
-        "kind": "unreachable",
-        "fields": [
-          "status",
-          "creditScore",
-          "employmentYears"
-        ]
-      },
-      "navigates": false,
-      "coverageKey": "LoanProcessing:reviewing+MANUAL_APPROVE->deciding[success]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "reviewing",
-      "event": "MANUAL_APPROVE",
-      "to": "deciding",
-      "toStates": [
-        "deciding"
-      ],
-      "variant": "success",
-      "payload": {},
-      "guarded": true,
-      "arm": 0,
-      "solved": false,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        }
-      ],
-      "payloadCase": "guard-fail",
-      "guardCase": "fail",
-      "guardSteerable": false,
-      "navigates": false,
-      "coverageKey": "LoanProcessing:reviewing+MANUAL_APPROVE->deciding[guard-fail]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "reviewing",
-      "event": "MANUAL_REJECT",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {},
-      "guarded": true,
-      "arm": 0,
-      "solved": false,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        }
-      ],
-      "payloadCase": "success",
-      "guardCase": "pass",
-      "guardSteerable": false,
-      "precondition": {
-        "kind": "unreachable",
-        "fields": [
-          "status"
-        ]
-      },
-      "navigates": false,
-      "coverageKey": "LoanProcessing:reviewing+MANUAL_REJECT->reviewing[success]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "reviewing",
-      "event": "MANUAL_REJECT",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {},
-      "guarded": true,
-      "arm": 0,
-      "solved": false,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        }
-      ],
-      "payloadCase": "guard-fail",
-      "guardCase": "fail",
-      "guardSteerable": false,
-      "navigates": false,
-      "coverageKey": "LoanProcessing:reviewing+MANUAL_REJECT->reviewing[guard-fail]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "reviewing",
-      "event": "SUBMIT",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {
-        "id": "LoanApplication-verify-seed-1"
-      },
-      "guarded": true,
-      "arm": 0,
-      "solved": false,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        }
-      ],
-      "payloadCase": "success",
-      "guardCase": "pass",
-      "guardSteerable": false,
-      "navigates": false,
-      "coverageKey": "LoanProcessing:reviewing+SUBMIT->reviewing[success]"
-    },
-    {
-      "trait": "LoanProcessing",
-      "linkedEntity": "LoanApplication",
-      "instanceId": "LoanApplication-verify-seed-1",
-      "seedRowId": "LoanApplication-verify-seed-1",
-      "from": "reviewing",
-      "event": "SUBMIT",
-      "to": "reviewing",
-      "toStates": [
-        "reviewing"
-      ],
-      "variant": "success",
-      "payload": {
-        "id": "LoanApplication-verify-seed-1"
-      },
-      "guarded": true,
-      "arm": 0,
-      "solved": false,
-      "preamble": [
-        {
-          "event": "REVIEW",
-          "payload": {
-            "row": {
-              "id": "LoanApplication-verify-seed-1"
-            }
-          }
-        }
-      ],
-      "payloadCase": "guard-fail",
-      "guardCase": "fail",
-      "guardSteerable": false,
-      "navigates": false,
-      "coverageKey": "LoanProcessing:reviewing+SUBMIT->reviewing[guard-fail]"
     }
   ],
   "configVariants": [],
@@ -835,5 +900,157 @@
       "state": "listing",
       "coverageKey": "LoanProcessing:listing+INIT->listing"
     }
-  ]
+  ],
+  "emitSweep": [
+    {
+      "trait": "LoanProcessing",
+      "from": "listing",
+      "event": "INIT",
+      "payload": {},
+      "navigates": false,
+      "coverageKey": "LoanProcessing:listing+INIT->listing[emit]"
+    }
+  ],
+  "dataMutations": [
+    {
+      "trait": "LoanProcessing",
+      "from": "creating",
+      "event": "SAVE",
+      "to": "listing",
+      "payload": {
+        "data": {
+          "id": "LoanApplication-verify-seed-1"
+        },
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "entity": "LoanApplication",
+      "kind": "create",
+      "rowDelta": 1,
+      "coverageKey": "LoanProcessing:creating+SAVE->listing[data-mutation:create]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "from": "reviewing",
+      "event": "SUBMIT",
+      "to": "reviewing",
+      "payload": {
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "entity": "LoanApplication",
+      "kind": "update",
+      "rowDelta": 0,
+      "bindRow": {
+        "payloadField": "id",
+        "wholeRow": false
+      },
+      "coverageKey": "LoanProcessing:reviewing+SUBMIT->reviewing[data-mutation:update]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "from": "reviewing",
+      "event": "AUTO_APPROVE",
+      "to": "reviewing",
+      "payload": {
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "entity": "LoanApplication",
+      "kind": "update",
+      "rowDelta": 0,
+      "bindRow": {
+        "payloadField": "id",
+        "wholeRow": false
+      },
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status",
+          "creditScore",
+          "employmentYears",
+          "existingDebt",
+          "annualIncome",
+          "requestedAmount"
+        ]
+      },
+      "coverageKey": "LoanProcessing:reviewing+AUTO_APPROVE->reviewing[data-mutation:update]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "from": "reviewing",
+      "event": "AUTO_REJECT",
+      "to": "reviewing",
+      "payload": {
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "entity": "LoanApplication",
+      "kind": "update",
+      "rowDelta": 0,
+      "bindRow": {
+        "payloadField": "id",
+        "wholeRow": false
+      },
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status",
+          "creditScore",
+          "existingDebt",
+          "annualIncome",
+          "requestedAmount"
+        ]
+      },
+      "coverageKey": "LoanProcessing:reviewing+AUTO_REJECT->reviewing[data-mutation:update]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "from": "deciding",
+      "event": "SAVE",
+      "to": "reviewing",
+      "payload": {
+        "data": {
+          "id": "LoanApplication-verify-seed-1"
+        },
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "entity": "LoanApplication",
+      "kind": "update",
+      "rowDelta": 0,
+      "bindRow": {
+        "payloadField": "id",
+        "wholeRow": false
+      },
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "requestedAmount"
+        ]
+      },
+      "coverageKey": "LoanProcessing:deciding+SAVE->reviewing[data-mutation:update]"
+    },
+    {
+      "trait": "LoanProcessing",
+      "from": "reviewing",
+      "event": "DISBURSE",
+      "to": "reviewing",
+      "payload": {
+        "id": "LoanApplication-verify-seed-1"
+      },
+      "entity": "LoanApplication",
+      "kind": "update",
+      "rowDelta": 0,
+      "bindRow": {
+        "payloadField": "id",
+        "wholeRow": false
+      },
+      "precondition": {
+        "kind": "unreachable",
+        "fields": [
+          "status",
+          "approvedAmount"
+        ]
+      },
+      "coverageKey": "LoanProcessing:reviewing+DISBURSE->reviewing[data-mutation:update]"
+    }
+  ],
+  "crudChains": [],
+  "tickSteps": []
 }

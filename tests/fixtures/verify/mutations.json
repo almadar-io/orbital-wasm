@@ -1,0 +1,173 @@
+{
+  "name": "mutations",
+  "orbitals": [
+    {
+      "name": "Main",
+      "entity": {
+        "name": "Note",
+        "persistence": "runtime",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "title",
+            "type": "string"
+          }
+        ]
+      },
+      "traits": [
+        {
+          "name": "Notes",
+          "linkedEntity": "Note",
+          "ticks": [
+            {
+              "name": "beat",
+              "interval": 1000,
+              "effects": []
+            }
+          ],
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              },
+              {
+                "name": "editing"
+              }
+            ],
+            "events": [
+              {
+                "key": "SAVE",
+                "name": "SAVE",
+                "payloadSchema": [
+                  {
+                    "name": "data",
+                    "type": "object",
+                    "entity": "Note"
+                  }
+                ]
+              },
+              {
+                "key": "REMOVE",
+                "name": "REMOVE",
+                "payloadSchema": [
+                  {
+                    "name": "id",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "key": "TOUCH",
+                "name": "TOUCH"
+              },
+              {
+                "key": "PICK",
+                "name": "PICK",
+                "payloadSchema": [
+                  {
+                    "name": "id",
+                    "type": "string"
+                  }
+                ]
+              }
+            ],
+            "transitions": [
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "INIT"
+              },
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "ADD",
+                "effects": [
+                  [
+                    "set",
+                    "@entity.id",
+                    "@payload.id"
+                  ],
+                  [
+                    "persist",
+                    "create",
+                    "Note",
+                    {
+                      "title": "t"
+                    },
+                    {
+                      "emit": {
+                        "success": "ADDED"
+                      }
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "idle",
+                "to": "editing",
+                "event": "PICK",
+                "effects": [
+                  [
+                    "set",
+                    "@entity.id",
+                    "@payload.id"
+                  ]
+                ]
+              },
+              {
+                "from": "editing",
+                "to": "idle",
+                "event": "SAVE",
+                "effects": [
+                  [
+                    "persist",
+                    "update",
+                    "Note",
+                    "@payload.data",
+                    {
+                      "emit": {
+                        "success": "SAVED"
+                      }
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "editing",
+                "to": "idle",
+                "event": "REMOVE",
+                "effects": [
+                  [
+                    "persist",
+                    "delete",
+                    "Note",
+                    "@payload.id"
+                  ]
+                ]
+              },
+              {
+                "from": "idle",
+                "to": "idle",
+                "event": "TOUCH",
+                "effects": [
+                  [
+                    "persist",
+                    "update",
+                    "Note",
+                    {
+                      "title": "x"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -266,6 +266,11 @@ impl ServerApi {
         result
     }
 
+    /// The server underneath, for a native host that answers its asks from the program's own egress and grants.
+    pub fn embedded(&self) -> &EmbeddedServer {
+        &self.embedded
+    }
+
     /// Whether the program's `os/` grants cover `requirement_json` (an `OsRequirement`).
     pub fn os_allows(&self, requirement_json: &str) -> Result<bool, String> {
         self.record(self.embedded.os_allows_json(requirement_json))
@@ -389,6 +394,8 @@ pub fn verify_plan(resolved_schema_json: &str, options_json: &str) -> String {
                 emit_sweep: orbital_core::verify::flows::plan_emit_sweep(&schema, &options),
                 contract_events: orbital_core::verify::flows::plan_contract_events(&schema, &options),
                 crud_chains: orbital_core::verify::flows::plan_crud_chains(&schema, &options),
+                tick_steps: orbital_core::verify::flows::plan_tick_steps(&schema, &options),
+                data_mutations: orbital_core::verify::flows::plan_data_mutations(&schema, &options),
             },
             Err(failure) => PlanOutcome::Refused { failure },
         },
@@ -513,4 +520,13 @@ pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, opti
     let query = parse(query_json, "query")?;
     let options = if options_json.is_empty() { Default::default() } else { parse(options_json, "options")? };
     to_json(&orbital_core::verify::flows::plan_transient_probe(&schema, &query, &options))
+}
+
+/// The hops that place a fresh machine in a state (`ReplayQuery` as JSON): a `PreambleEvent[]` as JSON, or `null`
+/// for an unknown trait or an unreachable state.
+pub fn verify_replay(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, String> {
+    let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
+    let query: orbital_core::verify::flows::ReplayQuery = parse(query_json, "query")?;
+    let options = if options_json.is_empty() { Default::default() } else { parse(options_json, "options")? };
+    to_json(&orbital_core::verify::flows::plan_replay(&schema, &query.trait_name, &query.state, &options))
 }

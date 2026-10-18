@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { Kernel, initSync } from '../pkg/orbital_wasm.js';
+import {
+  Kernel,
+  initSync,
+  evaluateGuards,
+  evaluateMany,
+  evaluateTraced,
+  mapListenPayload,
+  scopeRows,
+  checkMutationAccess,
+  resolveRowBinding,
+} from '../pkg/orbital_wasm.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const embed = join(here, '../../../orbital-core/tests/fixtures/embed');
@@ -128,7 +138,9 @@ for (const name of ['entity_payload_skeleton', '02-state-machine', '04-complex-g
     const golden = readJson(join(verifyFixtures, `${name}.plan.json`));
     assert.equal(golden.outcome, 'planned');
     assert.ok(golden.steps.length > 0);
-    assert.deepEqual(JSON.parse(verifyPlan(program, '')), golden);
+    const { contractEvents, ...planned } = JSON.parse(verifyPlan(program, ''));
+    assert.deepEqual(planned, golden);
+    assert.deepEqual(contractEvents, { available: false, steps: [] }, 'no language data is installed in this host');
   });
 }
 
@@ -174,4 +186,33 @@ test('verifyPlan carries the declared-value config sweep and the boot credits', 
   assert.deepEqual(gauge.variants.map((v) => v.label), ['animated = false', 'format = bar', 'format = numeric']);
   assert.deepEqual(gauge.noDeclaredValues, ['className', 'current']);
   assert.deepEqual(plan.initCredits, [{ trait: 'Gauge', state: 'idle', coverageKey: 'Gauge:idle+INIT->idle' }]);
+});
+
+test('evaluateMany binds a render in one crossing and a failing expression is its own outcome', () => {
+  const context = JSON.stringify({ entity: { qty: 3 }, payload: { step: 2 }, user: { role: 'admin' }, state: 'open' });
+  const out = JSON.parse(evaluateMany(context, JSON.stringify([['+', '@entity.qty', '@payload.step'], ['=', '@user.role', 'admin'], '@state', ['/', 1, 0], ['str/upper', '@payload.missing']])));
+  assert.deepEqual(out.slice(0, 3), [{ kind: 'value', value: 5 }, { kind: 'value', value: true }, { kind: 'value', value: 'open' }]);
+  assert.equal(out[3].kind, 'error');
+  assert.deepEqual(out[4], { kind: 'value', value: '' });
+});
+
+test('evaluateGuards decides by the kernel truthiness: an empty list is false', () => {
+  const verdicts = JSON.parse(evaluateGuards(JSON.stringify({ entity: { tags: [], n: 2 } }), JSON.stringify(['@entity.tags', '@entity.n', ['>', '@entity.n', 5]])));
+  assert.deepEqual(verdicts.map((v) => v.value), [false, true, false]);
+});
+
+test('evaluateTraced records the short-circuited argument as skipped', () => {
+  const run = JSON.parse(evaluateTraced('{}', JSON.stringify(['and', ['>', 0, 1], ['=', 1, 1]])));
+  assert.deepEqual(run.outcome, { kind: 'value', value: false });
+  assert.deepEqual(run.trace.filter((step) => step.kind === 'skip').map((step) => step.path), [[2]]);
+});
+
+test('mapListenPayload, scopeRows, checkMutationAccess and resolveRowBinding are the kernel access owner', () => {
+  assert.deepEqual(JSON.parse(mapListenPayload(JSON.stringify({ rowId: '@payload.id' }), JSON.stringify({ id: 'r1', extra: 1 }))), { rowId: 'r1' });
+  const rows = [{ id: 'a', owner: 'u1' }, { id: 'b', owner: 'u2' }];
+  const owner = JSON.stringify(['=', '@entity.owner', '@user.id']);
+  const kept = JSON.parse(scopeRows(JSON.stringify({ user: { id: 'u1' } }), JSON.stringify(rows), owner, '', 'Ticket'));
+  assert.deepEqual(kept.map((r) => r.id), ['a']);
+  assert.equal(JSON.parse(checkMutationAccess('update', JSON.stringify({ user: { id: 'u2' } }), JSON.stringify(rows[0]), owner, 'Ticket')).allowed, false);
+  assert.deepEqual(JSON.parse(resolveRowBinding('@user.id', JSON.stringify({ user: { id: 'u1' } }))), { kind: 'value', value: 'u1' });
 });

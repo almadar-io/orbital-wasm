@@ -1,0 +1,76 @@
+{
+  "start": {
+    "status": "done",
+    "response": {
+      "success": true,
+      "transitioned": true,
+      "states": {
+        "Draft": "saved"
+      },
+      "emittedEvents": [
+        {
+          "event": "SAVED",
+          "payload": {
+            "id": "d1",
+            "title": "draft"
+          },
+          "source": {
+            "orbital": "Main",
+            "trait": "Draft",
+            "dispatched": true,
+            "persistSuccess": true
+          }
+        }
+      ],
+      "effectResults": [
+        {
+          "effect": "persist",
+          "action": "create",
+          "entityType": "Note",
+          "data": {
+            "id": "d1",
+            "title": "draft"
+          },
+          "success": true
+        }
+      ],
+      "transitions": [
+        {
+          "trait": "Draft",
+          "from": "editing",
+          "to": "saving",
+          "event": "SAVE",
+          "effects": [
+            {
+              "type": "persist",
+              "args": [
+                "create",
+                "Note",
+                {
+                  "id": "d1",
+                  "title": "draft"
+                },
+                {
+                  "emit": {
+                    "success": "SAVED",
+                    "failure": "SAVE_FAILED"
+                  }
+                }
+              ],
+              "status": "executed"
+            }
+          ]
+        },
+        {
+          "trait": "Draft",
+          "from": "saving",
+          "to": "saved",
+          "event": "SAVED",
+          "effects": []
+        }
+      ]
+    }
+  },
+  "state": "saved",
+  "inFlight": 0
+}

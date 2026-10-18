@@ -37,12 +37,7 @@
       "guarded": true,
       "arm": 0,
       "solved": false,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
+      "preamble": [],
       "payloadCase": "success",
       "guardCase": "pass",
       "guardSteerable": false,
@@ -77,12 +72,7 @@
       "guarded": true,
       "arm": 0,
       "solved": false,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
+      "preamble": [],
       "payloadCase": "guard-fail",
       "guardCase": "fail",
       "guardSteerable": false,
@@ -126,12 +116,7 @@
       },
       "guarded": false,
       "solved": true,
-      "preamble": [
-        {
-          "event": "INIT",
-          "payload": {}
-        }
-      ],
+      "preamble": [],
       "payloadCase": "success",
       "navigates": false,
       "coverageKey": "Picker:waiting+SELECT->picked[success]"
@@ -149,5 +134,9 @@
       "state": "waiting",
       "coverageKey": "Picker:waiting+INIT->waiting"
     }
-  ]
+  ],
+  "emitSweep": [],
+  "dataMutations": [],
+  "crudChains": [],
+  "tickSteps": []
 }
