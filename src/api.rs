@@ -278,6 +278,14 @@ impl ServerApi {
         result
     }
 
+    /// A server holding this one's registered program and none of its session (`EmbeddedServer::fork_session`).
+    pub fn fork(&self) -> Result<Self, String> {
+        Ok(Self {
+            embedded: self.record(self.embedded.fork_session())?,
+            last_error: Mutex::new(String::new()),
+        })
+    }
+
     /// The server underneath, for a native host that answers its asks from the program's own egress and grants.
     pub fn embedded(&self) -> &EmbeddedServer {
         &self.embedded
@@ -469,6 +477,12 @@ pub fn verify_credit(steps_json: &str) -> Result<String, String> {
 /// Evaluate `expressions_json` (`SExpr[]`) against `context_json` (`EvalContextWire`): `EvalOutcomeWire[]` as JSON, in order.
 pub fn evaluate_many(context_json: &str, expressions_json: &str) -> Result<String, String> {
     orbital_core::embed::eval_wire::evaluate_many_json(context_json, expressions_json)
+}
+
+/// Resolve `values_json` (prop values) against `context_json`: every binding, embedded ones included, and every
+/// operator call. `EvalOutcomeWire[]` as JSON, in order.
+pub fn resolve_values(context_json: &str, values_json: &str) -> Result<String, String> {
+    orbital_core::embed::eval_wire::resolve_values_json(context_json, values_json)
 }
 
 /// Evaluate `guards_json` (`SExpr[]`) against `context_json`: `GuardOutcomeWire[]` as JSON, in order.

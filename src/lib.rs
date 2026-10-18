@@ -222,6 +222,12 @@ impl Server {
             .map_err(js)
     }
 
+    /// A server holding this one's registered program and none of its session: what a stateless host serves
+    /// each request from, instead of registering the program again.
+    pub fn fork(&self) -> Result<Server, JsError> {
+        self.api.fork().map(|api| Server { api }).map_err(js)
+    }
+
     #[wasm_bindgen(js_name = osAllows)]
     pub fn os_allows(&self, requirement_json: &str) -> Result<bool, JsError> {
         self.api.os_allows(requirement_json).map_err(js)
@@ -467,6 +473,13 @@ pub fn stream_finish(driver_json: &str, carry: &str) -> Result<String, JsError> 
 #[wasm_bindgen(js_name = evaluateMany)]
 pub fn evaluate_many(context_json: &str, expressions_json: &str) -> Result<String, JsError> {
     api::evaluate_many(context_json, expressions_json).map_err(js)
+}
+
+/// Resolve every prop value of a render against `contextJson` in one crossing: each binding, embedded ones
+/// included, and each operator call (`EvalOutcomeWire[]` as JSON, in order).
+#[wasm_bindgen(js_name = resolveValues)]
+pub fn resolve_values(context_json: &str, values_json: &str) -> Result<String, JsError> {
+    api::resolve_values(context_json, values_json).map_err(js)
 }
 
 /// Every guard of a render against a context in one crossing (`GuardOutcomeWire[]` as JSON).

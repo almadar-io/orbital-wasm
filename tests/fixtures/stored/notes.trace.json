@@ -32,6 +32,11 @@
             "title": "draft"
           },
           "success": true
+        },
+        {
+          "effect": "emit",
+          "success": true,
+          "target": "SAVED"
         }
       ],
       "transitions": [

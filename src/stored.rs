@@ -414,6 +414,15 @@ pub enum ServerHandle {
 }
 
 impl ServerHandle {
+    /// A plain server's fork ([`ServerApi::fork`]); a server that answers its own rows from a store holds that
+    /// store's session and is not forked.
+    pub fn fork(&self) -> Result<Self, String> {
+        match self {
+            Self::Plain(api) => api.fork().map(Self::Plain),
+            Self::Stored(_) => Err("a server over its own store is not forked: open one per session".to_string()),
+        }
+    }
+
     pub fn plain(resolved_schema_json: &str) -> Result<Self, String> {
         ServerApi::new(resolved_schema_json).map(Self::Plain)
     }
