@@ -93,6 +93,14 @@ impl KernelApi {
         })())
     }
 
+    /// The leg as a host that holds the circuit state takes it: only the `[shared]` frame rows its traits read.
+    pub fn stateful_leg(&self, leg_json: &str) -> Result<String, String> {
+        self.record((|| {
+            let leg: orbital_core::EventRequest = parse(leg_json, "leg_json")?;
+            to_json(&self.embedded.stateful_leg(leg))
+        })())
+    }
+
     /// The base a posted leg's answer is folded against; `None` when the leg carried no rows.
     pub fn fold_base(
         &self,
