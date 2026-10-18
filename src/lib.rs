@@ -178,6 +178,12 @@ impl Kernel {
         self.api.unmount(traits_json).map_err(js)
     }
 
+    /// The host's report of whether a trait's rendered output is on screen; gates its `[visible]` ticks.
+    #[wasm_bindgen(js_name = setTraitOnScreen)]
+    pub fn set_trait_on_screen(&self, trait_name: &str, on_screen: bool) {
+        self.api.set_trait_on_screen(trait_name, on_screen);
+    }
+
     #[wasm_bindgen(js_name = lastError)]
     pub fn last_error(&self) -> String {
         self.api.last_error()

@@ -234,6 +234,10 @@ impl KernelApi {
         )
     }
 
+    pub fn set_trait_on_screen(&self, trait_name: &str, on_screen: bool) {
+        self.embedded.set_trait_on_screen(trait_name, on_screen);
+    }
+
     pub fn last_error(&self) -> String {
         self.last_error
             .lock()
