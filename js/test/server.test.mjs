@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { Server, initSync } from '../pkg/orbital_wasm.js';
+import { pkgDir, loadPkg } from './pkg.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-initSync({ module: readFileSync(join(here, '../pkg/orbital_wasm_bg.wasm')) });
+const { Server, initSync } = await loadPkg();
+initSync({ module: readFileSync(join(pkgDir, 'orbital_wasm_bg.wasm')) });
 
 const emit = { emit: { success: 'SAVED', failure: 'SAVE_FAILED' } };
 const schema = JSON.stringify({

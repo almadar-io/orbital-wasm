@@ -303,18 +303,21 @@ pub fn install_language(bundle_json: &str) -> Result<(), JsError> {
 }
 
 /// The verifier's planner: what to fire for a resolved program (`PlanOutcome` as JSON).
+#[cfg(feature = "verify")]
 #[wasm_bindgen(js_name = verifyPlan)]
 pub fn verify_plan(resolved_schema_json: &str, options_json: &str) -> String {
     api::verify_plan(resolved_schema_json, options_json)
 }
 
 /// The oracle of one planned step (`StepWire` in, `Expectation` out, as JSON).
+#[cfg(feature = "verify")]
 #[wasm_bindgen(js_name = verifyExpect)]
 pub fn verify_expect(step_json: &str) -> Result<String, JsError> {
     api::verify_expect(step_json).map_err(js)
 }
 
 /// The verdict on one observed step (`Expectation` and `Observation` in, `VerdictWire` out, as JSON).
+#[cfg(feature = "verify")]
 #[wasm_bindgen(js_name = verifyJudge)]
 pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<String, JsError> {
     api::verify_judge(expectation_json, observation_json).map_err(js)
@@ -322,24 +325,28 @@ pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<St
 
 /// The failure-route steps of a walk credited from the hops other steps' dispatches fired
 /// (`CreditStep[]` in, `Credit[]` out, as JSON).
+#[cfg(feature = "verify")]
 #[wasm_bindgen(js_name = verifyCredit)]
 pub fn verify_credit(steps_json: &str) -> Result<String, JsError> {
     api::verify_credit(steps_json).map_err(js)
 }
 
 /// A rendered affordance the host found, planned (`AffordanceQuery` in, `AffordanceStep` or `null` out, as JSON).
+#[cfg(feature = "verify")]
 #[wasm_bindgen(js_name = verifyAffordance)]
 pub fn verify_affordance(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
     api::verify_affordance(resolved_schema_json, query_json, options_json).map_err(js)
 }
 
 /// The forced failure of a transient failure arm (`TransientQuery` in, `TransientOutcome` or `null` out, as JSON).
+#[cfg(feature = "verify")]
 #[wasm_bindgen(js_name = verifyTransientProbe)]
 pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
     api::verify_transient_probe(resolved_schema_json, query_json, options_json).map_err(js)
 }
 
 /// The hops that place a fresh machine in a state (`ReplayQuery` in, `PreambleEvent[]` or `null` out, as JSON).
+#[cfg(feature = "verify")]
 #[wasm_bindgen(js_name = verifyReplay)]
 pub fn verify_replay(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
     api::verify_replay(resolved_schema_json, query_json, options_json).map_err(js)
@@ -455,6 +462,19 @@ pub fn evaluate_guards(context_json: &str, guards_json: &str) -> Result<String, 
 #[wasm_bindgen(js_name = evaluateTraced)]
 pub fn evaluate_traced(context_json: &str, expression_json: &str) -> Result<String, JsError> {
     api::evaluate_traced(context_json, expression_json).map_err(js)
+}
+
+/// Effects run in order against a row (`TraceEffectsWire` as JSON): a trace per effect, the events raised, the writes made.
+#[wasm_bindgen(js_name = traceEffects)]
+pub fn trace_effects(context_json: &str, effects_json: &str) -> Result<String, JsError> {
+    api::trace_effects(context_json, effects_json).map_err(js)
+}
+
+/// The credentials a `store`-source boot seeds from the env (`[{ service, envVar }]` as JSON): what the store lacks and the env holds.
+#[cfg(feature = "full")]
+#[wasm_bindgen(js_name = credentialSeedPlan)]
+pub fn credential_seed_plan(declared_json: &str, held_json: &str, present_json: &str) -> Result<String, JsError> {
+    api::credential_seed_plan(declared_json, held_json, present_json).map_err(js)
 }
 
 /// A listen route's `with` mapping applied to the source payload (the mapped payload as JSON).

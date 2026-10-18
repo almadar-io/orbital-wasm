@@ -378,6 +378,7 @@ pub fn install_language(bundle_json: &str) -> Result<(), String> {
 
 /// Plan a resolved program for a driving host: a `PlanOutcome` as JSON. A program or options that do not
 /// parse, and a trait scope naming no trait, come back as the typed `refused` outcome, never as a throw.
+#[cfg(feature = "verify")]
 pub fn verify_plan(resolved_schema_json: &str, options_json: &str) -> String {
     use orbital_core::verify::plan_wire::{plan_program, PlanFailure, PlanOptions, PlanOutcome};
     let outcome = match (
@@ -404,12 +405,14 @@ pub fn verify_plan(resolved_schema_json: &str, options_json: &str) -> String {
 }
 
 /// The oracle of a planned step (`StepWire` as JSON): an `Expectation` as JSON.
+#[cfg(feature = "verify")]
 pub fn verify_expect(step_json: &str) -> Result<String, String> {
     let step: orbital_core::verify::plan_wire::StepWire = parse(step_json, "step")?;
     to_json(&step.expectation())
 }
 
 /// The verdict on an observed step (`Expectation` and `Observation` as JSON): a `VerdictWire` as JSON.
+#[cfg(feature = "verify")]
 pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<String, String> {
     let expectation = parse(expectation_json, "expectation")?;
     let observation = parse(observation_json, "observation")?;
@@ -437,6 +440,7 @@ pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Re
 }
 
 /// Credit the failure-route steps of a walk (`CreditStep[]` as JSON): the `Credit[]` as JSON.
+#[cfg(feature = "verify")]
 pub fn verify_credit(steps_json: &str) -> Result<String, String> {
     let steps: Vec<orbital_core::verify::plan_wire::CreditStep> = parse(steps_json, "steps")?;
     to_json(&orbital_core::verify::plan_wire::credit_failure_routes(&steps))
@@ -506,6 +510,7 @@ pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, St
 
 /// Plan a rendered affordance the host found (`AffordanceQuery` as JSON) in a resolved program: an
 /// `AffordanceStep` as JSON, or `null` when no trait of that name exists.
+#[cfg(feature = "verify")]
 pub fn verify_affordance(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, String> {
     let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
     let query = parse(query_json, "query")?;
@@ -515,6 +520,7 @@ pub fn verify_affordance(resolved_schema_json: &str, query_json: &str, options_j
 
 /// Plan the forced failure of a transient failure arm (`TransientQuery` as JSON): a `TransientOutcome` as JSON,
 /// or `null` when no trait of that name exists.
+#[cfg(feature = "verify")]
 pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, String> {
     let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
     let query = parse(query_json, "query")?;
@@ -524,9 +530,27 @@ pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, opti
 
 /// The hops that place a fresh machine in a state (`ReplayQuery` as JSON): a `PreambleEvent[]` as JSON, or `null`
 /// for an unknown trait or an unreachable state.
+#[cfg(feature = "verify")]
 pub fn verify_replay(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, String> {
     let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
     let query: orbital_core::verify::flows::ReplayQuery = parse(query_json, "query")?;
     let options = if options_json.is_empty() { Default::default() } else { parse(options_json, "options")? };
     to_json(&orbital_core::verify::flows::plan_replay(&schema, &query.trait_name, &query.state, &options))
+}
+
+// ---- traceEffects ----------------------------------------------------------------------------------------
+
+/// Run `effects_json` (`SExpr[]`) in order against the row in `context_json` (`EvalContextWire`): a `TraceEffectsWire`
+/// as JSON, with a trace per effect, the events raised, the writes made and the row after them.
+pub fn trace_effects(context_json: &str, effects_json: &str) -> Result<String, String> {
+    orbital_core::embed::eval_wire::trace_effects_json(context_json, effects_json)
+}
+
+// ---- credentialSeedPlan ----------------------------------------------------------------------------------
+
+/// The credentials a `store`-source boot copies from the env into the store (`[{ service, envVar }]` as JSON): the
+/// declared ones the store does not hold and the env sets, each once. Only names cross; the host reads each value from its own env.
+#[cfg(feature = "full")]
+pub fn credential_seed_plan(declared_json: &str, held_json: &str, present_json: &str) -> Result<String, String> {
+    orbital_core::credential_admin::seed_plan_json(declared_json, held_json, present_json)
 }

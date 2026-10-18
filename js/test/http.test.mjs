@@ -2,9 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createECDH, createHash, createHmac, createPublicKey, verify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { httpDriverStart, httpDriverResume, initSync } from '../pkg/orbital_wasm.js';
+import { join } from 'node:path';
+import { pkgDir, loadPkg } from './pkg.mjs';
 
-initSync({ module: readFileSync(new URL('../pkg/orbital_wasm_bg.wasm', import.meta.url)) });
+const { httpDriverStart, httpDriverResume, initSync } = await loadPkg();
+initSync({ module: readFileSync(join(pkgDir, 'orbital_wasm_bg.wasm')) });
 
 const origin = 'https://api.example.com';
 const tokenUrl = 'https://auth.example.com/token';

@@ -6,15 +6,24 @@ license = "BUSL-1.1"
 repository = "https://github.com/almadar-io/orbital-wasm"
 description = "The embedded Almadar kernel for JavaScript hosts (npm @almadar/kernel): wasm-bindgen marshalling over orbital_core::embed"
 
+[features]
+default = ["full"]
+# The full kernel: Node hosts and tools. The client build (`--no-default-features`) is what a browser loads.
+full = ["wire-drivers", "verify"]
+# Postgres and Redis over raw sockets; a browser cannot open them.
+wire-drivers = ["orbital-core/wire-drivers"]
+# The verifier's planner and verdict exports, called from Node harnesses only.
+verify = []
+
 [lib]
 name = "orbital_wasm"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-orbital-core = { git = "https://github.com/almadar-io/orbital-core", branch = "main" }
+orbital-core = { git = "https://github.com/almadar-io/orbital-core", branch = "main", default-features = false }
 serde_json = "1.0"
 wasm-bindgen = "=0.2.126"
 serde = { version = "1.0", features = ["derive"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-orbital-core = { git = "https://github.com/almadar-io/orbital-core", branch = "main", features = ["native-transport"] }
+orbital-core = { git = "https://github.com/almadar-io/orbital-core", branch = "main", default-features = false, features = ["native-transport"] }

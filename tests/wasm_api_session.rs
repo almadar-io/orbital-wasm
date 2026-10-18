@@ -5,7 +5,7 @@ use orbital_core::planner;
 use orbital_core::OrbitalSchema;
 use orbital_wasm::api::{
     check_mutation_access, evaluate_guards, evaluate_many, evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows,
-    verify_affordance, verify_credit, verify_expect, verify_judge, verify_plan, verify_replay, verify_transient_probe, KernelApi,
+    verify_affordance, verify_credit, verify_expect, verify_judge, verify_plan, verify_replay, verify_transient_probe, trace_effects, credential_seed_plan, KernelApi,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -708,4 +708,25 @@ fn an_exported_replay_places_a_fresh_machine_in_a_state_or_says_it_cannot() {
     let hops = parsed(&verify_replay(&program, r#"{"trait":"Flow","state":"busy"}"#, "").unwrap());
     assert_eq!((hops[0]["event"].as_str(), hops[0]["from"].as_str(), hops[0]["to"].as_str()), (Some("GO"), Some("idle"), Some("busy")));
     assert_eq!(parsed(&verify_replay(&program, r#"{"trait":"Flow","state":"gone"}"#, "").unwrap()), Value::Null);
+}
+
+#[test]
+fn trace_effects_runs_a_list_against_a_row_through_the_wasm_api() {
+    let context = json!({ "entity": { "n": 1 }, "state": "idle" });
+    let effects = json!([["set", "@entity.n", ["+", "@entity.n", 4]], ["emit", "DONE", { "n": "@entity.n" }]]);
+    let out = pj(&trace_effects(&context.to_string(), &effects.to_string()).unwrap());
+    assert_eq!(out["entity"]["n"].as_f64(), Some(5.0));
+    assert_eq!(out["emitted"][0]["event"], "DONE");
+    assert_eq!(out["emitted"][0]["payload"]["n"].as_f64(), Some(5.0));
+    assert_eq!(out["effects"][0]["status"], "executed");
+    assert!(trace_effects("{}", "not json").unwrap_err().contains("parse effects"), "a malformed list is an error");
+}
+
+#[test]
+fn credential_seed_plan_names_the_declared_credentials_the_store_lacks_from_the_names_the_env_sets() {
+    let declared = r#"[{"service":"stripe","envVar":"STRIPE_KEY"},{"service":"stripe","envVar":"STRIPE_WEBHOOK"}]"#;
+    let present = r#"["STRIPE_KEY","STRIPE_WEBHOOK"]"#;
+    let plan = credential_seed_plan(declared, r#"["STRIPE_WEBHOOK"]"#, present).unwrap();
+    assert_eq!(plan, r#"[{"service":"stripe","envVar":"STRIPE_KEY"}]"#);
+    assert_eq!(credential_seed_plan(declared, "[]", "[]").unwrap(), "[]", "control: nothing set, nothing to seed");
 }
