@@ -295,6 +295,12 @@ impl Server {
         self.api.set_tick_mount(traits_json).map_err(js)
     }
 
+    /// Mock-seed the `[runtime]` entities the kernel holds itself (a preview host, per fresh kernel).
+    #[wasm_bindgen(js_name = seedRuntimeMock)]
+    pub fn seed_runtime_mock(&self, viewer_id: Option<String>) {
+        self.api.seed_runtime_mock(viewer_id);
+    }
+
     #[wasm_bindgen(js_name = lastError)]
     pub fn last_error(&self) -> String {
         self.api.last_error()
