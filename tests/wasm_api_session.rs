@@ -730,3 +730,37 @@ fn credential_seed_plan_names_the_declared_credentials_the_store_lacks_from_the_
     assert_eq!(plan, r#"[{"service":"stripe","envVar":"STRIPE_KEY"}]"#);
     assert_eq!(credential_seed_plan(declared, "[]", "[]").unwrap(), "[]", "control: nothing set, nothing to seed");
 }
+
+fn greeting_schema() -> String {
+    json!({
+        "name": "site",
+        "orbitals": [{
+            "name": "Home",
+            "entity": { "name": "HomeView", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [{
+                "name": "HomePage", "linkedEntity": "HomeView",
+                "stateMachine": {
+                    "states": [{ "name": "idle", "isInitial": true }],
+                    "transitions": [{ "from": "idle", "to": "idle", "event": "INIT",
+                        "effects": [["render-ui", "main", { "type": "typography", "content": ["i18n/t", "site:hero.title"] }]] }]
+                }
+            }]
+        }]
+    })
+    .to_string()
+}
+
+#[test]
+fn the_client_kernel_paints_i18n_from_the_catalogs_the_host_sets() {
+    let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
+    kernel.set_messages(r#"["en"]"#, r#"{"en":{"site:hero.title":"Hello"}}"#).unwrap();
+    let wire = parsed(&kernel.dispatch("HomePage", None, "INIT", None).unwrap());
+    assert!(wire["response"]["clientEffects"].to_string().contains("\"Hello\""), "{wire:#}");
+}
+
+#[test]
+fn control_a_malformed_catalog_is_refused_by_name() {
+    let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
+    let err = kernel.set_messages(r#"["en"]"#, r#"{"en":["not","a","map"]}"#).unwrap_err();
+    assert!(err.contains("catalogs_json"), "{err}");
+}

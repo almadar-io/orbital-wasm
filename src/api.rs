@@ -230,6 +230,14 @@ impl KernelApi {
         )
     }
 
+    /// The viewer's locales (`string[]`, the first is painted) and their catalogs (`{ [locale]: { [key]: text } }`), as JSON.
+    pub fn set_messages(&self, locales_json: &str, catalogs_json: &str) -> Result<(), String> {
+        self.record(parse::<Vec<String>>(locales_json, "locales_json").and_then(|locales| {
+            parse::<std::collections::HashMap<String, std::collections::HashMap<String, String>>>(catalogs_json, "catalogs_json")
+                .map(|catalogs| self.embedded.set_messages(locales, catalogs))
+        }))
+    }
+
     pub fn mount(&self, traits_json: &str) -> Result<(), String> {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json").map(|t| self.embedded.mount(t)),
@@ -332,6 +340,13 @@ impl ServerApi {
     pub fn set_default_user(&self, user_json: &str) -> Result<(), String> {
         self.record(
             parse::<Value>(user_json, "user_json").map(|u| self.embedded.set_default_user(u)),
+        )
+    }
+
+    /// The program (as JSON) whose declared credentials this server's credential effects manage beside its own.
+    pub fn set_managed_program(&self, program_json: &str) -> Result<(), String> {
+        self.record(
+            parse::<serde_json::Value>(program_json, "program_json").map(|p| self.embedded.set_managed_program(&p)),
         )
     }
 

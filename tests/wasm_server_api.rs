@@ -357,3 +357,11 @@ fn signing_in_with_firebase_does_not_open_googleapis_to_the_programs_own_http() 
         .unwrap_or_default();
     assert!(refusal.starts_with("egress denied: https://www.googleapis.com"), "the program's own http still needs its own egress: {done:#}");
 }
+
+#[test]
+fn the_managed_program_is_set_by_json_and_a_malformed_one_is_refused() {
+    let api = ServerApi::new(&schema().to_string()).unwrap();
+    api.set_managed_program(r#"{"name":"shop","orbitals":[]}"#).unwrap();
+    let err = api.set_managed_program("not json").unwrap_err();
+    assert!(err.contains("program_json"), "{err}");
+}

@@ -175,6 +175,11 @@ impl Kernel {
         self.api.remount(traits_json).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = setMessages)]
+    pub fn set_messages(&self, locales_json: &str, catalogs_json: &str) -> Result<(), JsError> {
+        self.api.set_messages(locales_json, catalogs_json).map_err(js)
+    }
+
     pub fn mount(&self, traits_json: &str) -> Result<(), JsError> {
         self.api.mount(traits_json).map_err(js)
     }
@@ -267,6 +272,11 @@ impl Server {
     #[wasm_bindgen(js_name = getState)]
     pub fn get_state(&self, trait_name: &str, entity_id: Option<String>) -> String {
         self.api.get_state(trait_name, entity_id.as_deref())
+    }
+
+    #[wasm_bindgen(js_name = setManagedProgram)]
+    pub fn set_managed_program(&self, program_json: &str) -> Result<(), JsError> {
+        self.api.set_managed_program(program_json).map_err(js)
     }
 
     #[wasm_bindgen(js_name = setDefaultUser)]
