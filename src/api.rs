@@ -209,6 +209,11 @@ impl KernelApi {
         self.embedded.set_host_fans_out(fans_out);
     }
 
+    /// Carry each hop's `@entity` before and after it on the dispatch's transitions, for a verifier (EXEC-STEP-10).
+    pub fn set_record_entity_after(&self, record: bool) {
+        self.embedded.set_record_entity_after(record);
+    }
+
     pub fn resolve_rows(&self, ref_json: &str) -> Result<String, String> {
         self.record(
             parse::<orbital_core::runtime::row_query::RowSetRef>(ref_json, "ref_json")

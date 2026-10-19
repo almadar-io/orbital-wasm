@@ -161,6 +161,13 @@ impl Kernel {
         self.api.set_host_fans_out(fans_out);
     }
 
+    /// Carry each hop's `@entity` before and after it on the dispatch's transitions (`observed`), for a verifier
+    /// judging `@ensures`. Off by default (EXEC-STEP-10).
+    #[wasm_bindgen(js_name = setRecordEntityAfter)]
+    pub fn set_record_entity_after(&self, record: bool) {
+        self.api.set_record_entity_after(record);
+    }
+
     /// A row-set reference resolved against this kernel's rows for its current user (`{ rows, total }`).
     #[wasm_bindgen(js_name = resolveRows)]
     pub fn resolve_rows(&self, ref_json: &str) -> Result<String, JsError> {
