@@ -459,6 +459,13 @@ pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<St
     to_json(&orbital_core::verify::plan_wire::judge(&expectation, &observation))
 }
 
+/// A fired transition's `@ensures` judged on one run (S-expression list and `PropositionObservation` as JSON): a
+/// `PropositionVerdict` as JSON.
+#[cfg(feature = "verify")]
+pub fn verify_proposition(ensures_json: &str, observation_json: &str) -> Result<String, String> {
+    orbital_core::verify::plan_wire::verify_proposition(ensures_json, observation_json)
+}
+
 /// Whether the absolute `glob` matches `path`: the one-grant matcher `os/glob` filters with.
 pub fn os_glob_matches(glob: &str, path: &str) -> bool {
     orbital_core::embed::os_glob_matches(glob, path)

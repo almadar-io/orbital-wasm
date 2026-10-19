@@ -356,6 +356,14 @@ pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<St
     api::verify_judge(expectation_json, observation_json).map_err(js)
 }
 
+/// A fired transition's `@ensures` judged on one run (S-expression list and `PropositionObservation` in,
+/// `PropositionVerdict` out, as JSON).
+#[cfg(feature = "verify")]
+#[wasm_bindgen(js_name = verifyProposition)]
+pub fn verify_proposition(ensures_json: &str, observation_json: &str) -> Result<String, JsError> {
+    api::verify_proposition(ensures_json, observation_json).map_err(js)
+}
+
 /// The failure-route steps of a walk credited from the hops other steps' dispatches fired
 /// (`CreditStep[]` in, `Credit[]` out, as JSON).
 #[cfg(feature = "verify")]
