@@ -269,29 +269,6 @@ fn control_a_production_environment_refuses_the_memory_store() {
 }
 
 #[test]
-fn a_native_server_answers_the_hosts_asks_itself_under_the_programs_egress() {
-    let program = with_http(schema());
-    let env: std::collections::HashMap<String, String> = serde_json::from_str(STORED_ENV).unwrap();
-    let events: orbital_wasm::stored::LiveSink = std::sync::Arc::new(|_| {});
-    let server = orbital_wasm::stored::ServerHandle::from_env_native(&program.to_string(), &env, events.clone()).unwrap();
-    let failure = |done: &Value| -> String {
-        let event = done["response"]["emittedEvents"].as_array().unwrap().iter().find(|e| e["event"] == "SAVE_FAILED").cloned();
-        event.map(|e| e["payload"]["error"].as_str().unwrap_or_default().to_string()).unwrap_or_default()
-    };
-    let done = progress(&server.start("Main", &save()).unwrap());
-    assert_eq!(done["status"], "done", "no ask reached the host: {done:#}");
-    assert!(failure(&done).contains("did not resolve"), "the declared origin was tried and could not be reached: {done:#}");
-
-    let mut undeclared = with_http(schema());
-    undeclared["egress"] = json!([]);
-    let server = orbital_wasm::stored::ServerHandle::from_env_native(&undeclared.to_string(), &env, events).unwrap();
-    let refused = progress(&server.start("Main", &save()).unwrap());
-    assert_eq!(refused["status"], "done", "{refused:#}");
-    let reason = failure(&refused);
-    assert!(!reason.is_empty() && !reason.contains("did not resolve"), "control: an origin the program does not declare is refused before any lookup: {reason}");
-}
-
-#[test]
 fn the_installed_language_exports_as_a_bundle_a_host_without_node_modules_installs() {
     let bundle = orbital_core::language_data::language_bundle_json().unwrap();
     let value: Value = serde_json::from_str(&bundle).unwrap();
@@ -309,53 +286,6 @@ fn the_installed_language_exports_as_a_bundle_a_host_without_node_modules_instal
     tampered["core"]["compiler"] = json!("=0.0.1");
     let err = install_language(&tampered.to_string()).unwrap_err();
     assert!(err.starts_with("ORB_LANGUAGE_DATA_INCOMPATIBLE"), "control: a bundle for another orb is refused: {err}");
-}
-
-fn owned_notes() -> Value {
-    let mut program = schema();
-    program["orbitals"][0]["entity"]["read_policy"] = json!(["=", ["object/get", "@entity", "ownerId"], "@user.id"]);
-    program["orbitals"][0]["entity"]["fields"].as_array_mut().unwrap().push(json!({ "name": "ownerId", "type": "string" }));
-    program
-}
-
-fn live_item(target: &str, origin: &str) -> String {
-    json!({ "event": "NOTE_SAVED", "payload": { "id": "d1", "ownerId": "u1" }, "source": { "trait": "Draft" }, "originClientId": origin, "target": target }).to_string()
-}
-
-#[test]
-fn live_items_are_routed_by_the_kernels_rule_origin_to_its_request_and_peers_by_the_viewers_read_policy() {
-    let (server, _) = stored(&owned_notes());
-    let server = orbital_wasm::stored::ServerHandle::Stored(server);
-    let connections = json!([
-        { "clientId": "a", "viewer": { "id": "u1" } },
-        { "clientId": "b", "viewer": { "id": "u2" } },
-        { "clientId": "c", "viewer": null },
-        { "clientId": "d", "viewer": { "id": "u1" } }
-    ]).to_string();
-    let recipients = |item: String| -> Vec<usize> { serde_json::from_str(&server.live_recipients(&item, &connections).unwrap()).unwrap() };
-    assert_eq!(recipients(live_item("origin", "b")), vec![1], "an origin item reaches only the requesting connection");
-    assert_eq!(recipients(live_item("peers", "a")), vec![2, 3], "a peers item skips its own connection and the viewer who may not read the row");
-    assert_eq!(recipients(live_item("origin", "nobody")), Vec::<usize>::new(), "control: an origin no connection holds reaches none");
-}
-
-#[test]
-fn signing_in_with_firebase_does_not_open_googleapis_to_the_programs_own_http() {
-    let mut program = with_http(schema());
-    program["egress"] = json!([]);
-    program["orbitals"][0]["traits"][0]["stateMachine"]["transitions"][0]["effects"][1][2] = json!("https://www.googleapis.com");
-    let env: std::collections::HashMap<String, String> =
-        serde_json::from_str(r#"{"DATA_BACKEND":"mock","NODE_ENV":"development","FIREBASE_PROJECT_ID":"test-project"}"#).unwrap();
-    let sink: orbital_wasm::stored::LiveSink = std::sync::Arc::new(|_| {});
-    let server = orbital_wasm::stored::ServerHandle::from_env_native(&program.to_string(), &env, sink).unwrap();
-    let done = progress(&server.start("Main", &save()).unwrap());
-    let refusal = done["response"]["emittedEvents"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|e| e["event"] == "SAVE_FAILED")
-        .map(|e| e["payload"]["error"].as_str().unwrap_or_default().to_string())
-        .unwrap_or_default();
-    assert!(refusal.starts_with("egress denied: https://www.googleapis.com"), "the program's own http still needs its own egress: {done:#}");
 }
 
 #[test]

@@ -3,11 +3,9 @@
 //! still waits on the host lists only the requests the host owns, and `resume` takes only those answers.
 
 use crate::api::ServerApi;
-use orbital_core::effects::LiveBroadcastItem;
 use orbital_core::embed::wire::{IoAnswerWire, IoRequestWire};
-use orbital_core::runtime::auth::SignIn;
 use orbital_core::runtime::entity_source::EntitySource;
-use orbital_core::runtime::resumable::{BlockingHost, IoAnswer, IoRequest};
+use orbital_core::runtime::resumable::{BlockingHost, IoRequest};
 use orbital_core::runtime::row_query::{QueryCapabilities, WriteCapabilities};
 use orbital_core::{EntityRef, OrbitalSchema};
 use serde_json::Value;
@@ -27,49 +25,9 @@ pub struct StoreCapabilities {
     pub write: Option<WriteCapabilities>,
 }
 
-/// Answers any ask on this machine, or declines it (`None`) so the host answers it.
-pub type LocalAnswers = Arc<dyn Fn(&IoRequest) -> Option<IoAnswer> + Send + Sync>;
-
-/// The prefix of an error that is a refused bearer, not a failed dispatch.
-pub const UNAUTHORIZED: &str = "ORB_UNAUTHORIZED";
-
-/// Receives each live item a dispatch produced; the host routes it to connections with [`ServerHandle::live_recipients`].
-pub type LiveSink = Arc<dyn Fn(LiveBroadcastItem) + Send + Sync>;
-
-thread_local! {
-    /// The client whose request this thread is serving: the origin of the live messages its calls make.
-    static ORIGIN: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
-}
-
-/// Serves `client_id`'s request from this thread until it drops.
-struct OriginGuard(Option<String>);
-
-impl OriginGuard {
-    fn enter(client_id: Option<String>) -> Self {
-        Self(ORIGIN.with(|slot| slot.replace(client_id)))
-    }
-}
-
-impl Drop for OriginGuard {
-    fn drop(&mut self) {
-        ORIGIN.with(|slot| *slot.borrow_mut() = self.0.take());
-    }
-}
-
-fn client_of(request_json: &str) -> Option<String> {
-    serde_json::from_str::<Value>(request_json)
-        .ok()?
-        .get("clientId")?
-        .as_str()
-        .map(str::to_string)
-}
-
 pub struct StoredServer {
     api: ServerApi,
-    live: Option<LiveSink>,
     source: Arc<dyn EntitySource>,
-    local: Option<LocalAnswers>,
-    sign_in: Option<SignIn>,
     held: Mutex<HashMap<u64, Vec<Value>>>,
     held_resolve: Mutex<HashMap<u64, Vec<Value>>>,
 }
@@ -116,10 +74,7 @@ impl StoredServer {
         }
         Ok(Self {
             api,
-            live: None,
             source,
-            local: None,
-            sign_in: None,
             held: Mutex::new(HashMap::new()),
             held_resolve: Mutex::new(HashMap::new()),
         })
@@ -149,159 +104,18 @@ impl StoredServer {
         )
     }
 
-    /// The server answering every ask on this machine, as `orb serve` does: rows from the store the environment
-    /// selects, `http` and `os/` under the program's own egress and grants, secrets and credentials from the
-    /// environment, the clock and random bytes, and the refusals of a host with no providers. `on_live` receives each
-    /// live item a dispatch produces: a streaming call's messages (to the requesting connection) and the `persist`
-    /// successes (to every other), addressed as `orb serve` addresses them.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn from_env_native(
-        resolved_schema_json: &str,
-        env: &HashMap<String, String>,
-        on_live: LiveSink,
-    ) -> Result<Self, String> {
-        use orbital_core::runtime::credentials::credentials_from_env;
-        use orbital_core::runtime::native_host::NativeHost;
-        use orbital_core::runtime::native_transport::UreqTransport;
-        use orbital_core::runtime::os_host::OsHandles;
-        use orbital_core::runtime::store_config::row_store_from_env;
-        let store = row_store_from_env(
-            &|name| env.get(name).cloned(),
-            &|path| std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}")),
-            Arc::new(UreqTransport::unchecked()),
-        )?;
-        let source = store.source.clone();
-        let mut server = Self::new(
-            resolved_schema_json,
-            store.source,
-            StoreCapabilities {
-                query: store.query,
-                write: store.write,
-            },
-        )?;
-        let (egress, grants) = {
-            let embedded = server.api.embedded();
-            (embedded.kernel().egress(), embedded.os_grants())
-        };
-        let sink = on_live.clone();
-        let on_event: Arc<orbital_core::runtime::native_host::StreamEvents> =
-            Arc::new(move |site, payload| {
-                let Some(site) = site else { return };
-                let Some(event) = site.emit.on_message.clone() else {
-                    return;
-                };
-                let origin = ORIGIN.with(|slot| slot.borrow().clone());
-                sink(LiveBroadcastItem::call_message(
-                    event,
-                    payload,
-                    site.trait_name.clone(),
-                    origin,
-                ));
-            });
-        let credentials = Arc::new(credentials_from_env());
-        let finder = source.clone();
-        let host = Arc::new(NativeHost::new(
-            source,
-            Arc::new(UreqTransport::with_egress(egress.clone())),
-            credentials.clone(),
-            egress,
-            grants,
-            Arc::new(OsHandles::default()),
-            on_event,
-        ));
-        server.local = Some(Arc::new(move |request| Some(host.answer(request))));
-        let schema: OrbitalSchema = serde_json::from_str(resolved_schema_json)
-            .map_err(|e| format!("parse resolved schema: {e}"))?;
-        let clock: orbital_core::runtime::auth::Clock =
-            Arc::new(orbital_core::time_util::now_millis);
-        server.sign_in = orbital_core::runtime::auth::sign_in_from_env(
-            env,
-            &schema,
-            &orbital_core::runtime::native_transport::feed_host,
-            credentials,
-            clock,
-            Arc::new(move |entity, id| {
-                finder
-                    .find(entity, id)
-                    .map(|row| row.and_then(|row| serde_json::to_value(&*row).ok()))
-            }),
-        )?;
-        server.live = Some(on_live);
-        Ok(server)
-    }
-
     /// Everything of the server that is not a flight: state, mounts, messages, grants, the last error.
     pub fn api(&self) -> &ServerApi {
         &self.api
     }
 
     pub fn start(&self, orbital: &str, request_json: &str) -> Result<String, String> {
-        let client = client_of(request_json);
-        let _serving = OriginGuard::enter(client.clone());
         let progress = self.api.start(orbital, request_json)?;
-        let done = self.pump(progress, Flight::Dispatch)?;
-        self.publish_persisted(&done, client.as_deref());
-        Ok(done)
+        self.pump(progress, Flight::Dispatch)
     }
 
     pub fn resume(&self, flight: u64, replies_json: &str) -> Result<String, String> {
         self.go_on(flight, replies_json, Flight::Dispatch)
-    }
-
-    /// The viewer an `Authorization` header resolves to, as JSON: the user the program's sign-in makes of a verified
-    /// bearer, the anonymous viewer for no header, and `null` when the program declares no sign-in (a viewer-less
-    /// server). A bearer that does not verify, or one on a server that cannot verify it, is an `UNAUTHORIZED` error.
-    pub fn viewer_json(&self, authorization: Option<&str>) -> Result<String, String> {
-        let Some(sign_in) = &self.sign_in else {
-            return match authorization {
-                None => Ok("null".to_string()),
-                Some(_) => Err(format!(
-                    "{UNAUTHORIZED}: this server declares no sign-in, so it verifies no bearer"
-                )),
-            };
-        };
-        let viewer = sign_in
-            .viewer(authorization, true)
-            .map_err(|e| format!("{UNAUTHORIZED}: {e}"))?;
-        json(&viewer)
-    }
-
-    /// [`Self::start`] as the viewer `authorization` names. The request's own `user` is never read: it is dropped, and the
-    /// viewer is the verified bearer's (the anonymous viewer without one).
-    pub fn start_as(
-        &self,
-        orbital: &str,
-        request_json: &str,
-        authorization: Option<&str>,
-    ) -> Result<String, String> {
-        let mut request: Value =
-            serde_json::from_str(request_json).map_err(|e| format!("parse request_json: {e}"))?;
-        let Some(fields) = request.as_object_mut() else {
-            return Err("request_json must be an object".to_string());
-        };
-        fields.remove("user");
-        let viewer: Value =
-            serde_json::from_str(&self.viewer_json(authorization)?).map_err(|e| e.to_string())?;
-        if !viewer.is_null() {
-            fields.insert("user".to_string(), viewer);
-        }
-        self.start(orbital, &request.to_string())
-    }
-
-    fn publish_persisted(&self, progress: &str, client_id: Option<&str>) {
-        let Some(live) = &self.live else { return };
-        let Ok(value) = serde_json::from_str::<Value>(progress) else {
-            return;
-        };
-        let Some(response) = value.get("response").cloned() else {
-            return;
-        };
-        let Ok(response) = serde_json::from_value::<orbital_core::EventResponse>(response) else {
-            return;
-        };
-        for item in LiveBroadcastItem::persisted(&response, client_id) {
-            live(item);
-        }
     }
 
     pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
@@ -368,19 +182,13 @@ impl StoredServer {
                 )
                 .map_err(|e| format!("parse request: {e}"))?;
                 let request = IoRequest::from(wire.clone());
-                let answer = match &self.local {
-                    Some(local) => local(&request),
-                    None => None,
-                }
-                .or_else(|| {
-                    is_row_request(&wire).then(|| {
-                        BlockingHost {
-                            source: self.source.as_ref(),
-                            service: None,
-                            substrate: None,
-                        }
-                        .answer(&request)
-                    })
+                let answer = is_row_request(&wire).then(|| {
+                    BlockingHost {
+                        source: self.source.as_ref(),
+                        service: None,
+                        substrate: None,
+                    }
+                    .answer(&request)
                 });
                 let Some(answer) = answer else {
                     host_owned.push(pending);
@@ -433,71 +241,6 @@ impl ServerHandle {
         env: &HashMap<String, String>,
     ) -> Result<Self, String> {
         StoredServer::from_env(resolved_schema_json, env).map(Self::Stored)
-    }
-
-    /// The server answering every ask on this machine ([`StoredServer::from_env_native`]).
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn from_env_native(
-        resolved_schema_json: &str,
-        env: &HashMap<String, String>,
-        on_live: LiveSink,
-    ) -> Result<Self, String> {
-        StoredServer::from_env_native(resolved_schema_json, env, on_live).map(Self::Stored)
-    }
-
-    /// [`StoredServer::viewer_json`]; a server that answers through its host verifies no bearer.
-    pub fn viewer_json(&self, authorization: Option<&str>) -> Result<String, String> {
-        match self {
-            Self::Stored(stored) => stored.viewer_json(authorization),
-            Self::Plain(_) => Err(format!("{UNAUTHORIZED}: this server verifies no bearer")),
-        }
-    }
-
-    /// [`StoredServer::start_as`].
-    pub fn start_as(
-        &self,
-        orbital: &str,
-        request_json: &str,
-        authorization: Option<&str>,
-    ) -> Result<String, String> {
-        match self {
-            Self::Stored(stored) => stored.start_as(orbital, request_json, authorization),
-            Self::Plain(_) => Err(format!("{UNAUTHORIZED}: this server verifies no bearer")),
-        }
-    }
-
-    /// Which of `connections` (`[{ "clientId": string | null, "viewer": user | null }]` as JSON) receive the live item
-    /// `item_json`, as indexes into it (a JSON array): the kernel's one routing rule — an origin item to the
-    /// requesting connection only, a peers item to every other connection whose viewer may read its row.
-    pub fn live_recipients(
-        &self,
-        item_json: &str,
-        connections_json: &str,
-    ) -> Result<String, String> {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Connection {
-            client_id: Option<String>,
-            viewer: Option<Value>,
-        }
-        let item: LiveBroadcastItem =
-            serde_json::from_str(item_json).map_err(|e| format!("parse item_json: {e}"))?;
-        let connections: Vec<Connection> = serde_json::from_str(connections_json)
-            .map_err(|e| format!("parse connections_json: {e}"))?;
-        let kernel = self.api().embedded().kernel();
-        let delivered: Vec<usize> = connections
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| {
-                item.delivered_to(c.client_id.as_deref(), |item| match &c.viewer {
-                    Some(viewer) => serde_json::from_value::<orbital_core::Value>(viewer.clone())
-                        .is_ok_and(|viewer| kernel.live_item_visible_to(item, &viewer)),
-                    None => true,
-                })
-            })
-            .map(|(at, _)| at)
-            .collect();
-        json(&delivered)
     }
 
     /// Everything of the server that is not a flight.
