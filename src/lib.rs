@@ -255,6 +255,16 @@ impl Server {
             .map_err(js)
     }
 
+    #[wasm_bindgen(js_name = liveItemDelivered)]
+    pub fn live_item_delivered(&self, item_json: &str, viewer_json: &str, client_id: Option<String>) -> Result<bool, JsError> {
+        self.api.live_item_delivered(item_json, viewer_json, client_id.as_deref()).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = dispatchStream)]
+    pub fn dispatch_stream(&self) -> Result<String, JsError> {
+        self.api.dispatch_stream().map_err(js)
+    }
+
     #[wasm_bindgen(js_name = resolveRows)]
     pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, JsError> {
         self.api.resolve_rows(ref_json, viewer_json).map_err(js)
@@ -566,4 +576,9 @@ pub fn check_mutation_access(
 #[wasm_bindgen(js_name = resolveRowBinding)]
 pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, JsError> {
     api::resolve_row_binding(term, bindings_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = substrateCompletionEvent)]
+pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, outcome_json: &str) -> Result<String, JsError> {
+    api::substrate_completion_event(site_json, key, op, outcome_json).map_err(js)
 }

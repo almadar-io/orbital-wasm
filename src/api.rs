@@ -309,6 +309,14 @@ impl ServerApi {
         self.record(self.embedded.os_allows_json(requirement_json))
     }
 
+    pub fn live_item_delivered(&self, item_json: &str, viewer_json: &str, client_id: Option<&str>) -> Result<bool, String> {
+        self.record(self.embedded.live_item_delivered(item_json, viewer_json, client_id))
+    }
+
+    pub fn dispatch_stream(&self) -> Result<String, String> {
+        self.record(self.embedded.dispatch_stream_json())
+    }
+
     /// Start a request against `orbital`; a `ServerProgressWire` as JSON.
     pub fn start(&self, orbital: &str, request_json: &str) -> Result<String, String> {
         self.record(self.embedded.start_json(orbital, request_json))
@@ -611,4 +619,8 @@ pub fn trace_effects(context_json: &str, effects_json: &str) -> Result<String, S
 #[cfg(feature = "full")]
 pub fn credential_seed_plan(declared_json: &str, held_json: &str, present_json: &str) -> Result<String, String> {
     orbital_core::credential_admin::seed_plan_json(declared_json, held_json, present_json)
+}
+
+pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, outcome_json: &str) -> Result<String, String> {
+    orbital_core::embed::substrate_completion_event_json(site_json, key, op, outcome_json)
 }
