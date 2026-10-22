@@ -240,6 +240,14 @@ impl Server {
         self.api.fork().map(|api| Server { api }).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = forkProgram)]
+    pub fn fork_program(&self, program_json: &str) -> Result<Server, JsError> {
+        self.api
+            .fork_program(program_json)
+            .map(|api| Server { api })
+            .map_err(js)
+    }
+
     #[wasm_bindgen(js_name = osAllows)]
     pub fn os_allows(&self, requirement_json: &str) -> Result<bool, JsError> {
         self.api.os_allows(requirement_json).map_err(js)
@@ -581,4 +589,78 @@ pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, Js
 #[wasm_bindgen(js_name = substrateCompletionEvent)]
 pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, outcome_json: &str) -> Result<String, JsError> {
     api::substrate_completion_event(site_json, key, op, outcome_json).map_err(js)
+}
+
+pub use orbital_core::embed::memory::MemoryStoreApi;
+
+#[derive(Default)]
+#[wasm_bindgen]
+pub struct MemoryStore {
+    api: MemoryStoreApi,
+}
+
+#[wasm_bindgen]
+impl MemoryStore {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            api: MemoryStoreApi::new(),
+        }
+    }
+    #[wasm_bindgen(js_name = getById)]
+    pub fn get_by_id(&self, entity_type: &str, id: &str) -> Result<String, JsError> {
+        self.api.get_by_id(entity_type, id).map_err(js)
+    }
+    #[wasm_bindgen(js_name = list)]
+    pub fn list(&self, entity_type: &str) -> Result<String, JsError> {
+        self.api.list(entity_type).map_err(js)
+    }
+    #[wasm_bindgen(js_name = create)]
+    pub fn create(&self, entity_type: &str, data_json: &str) -> Result<String, JsError> {
+        self.api.create(entity_type, data_json).map_err(js)
+    }
+    #[wasm_bindgen(js_name = update)]
+    pub fn update(&self, entity_type: &str, id: &str, data_json: &str) -> Result<String, JsError> {
+        self.api.update(entity_type, id, data_json).map_err(js)
+    }
+    #[wasm_bindgen(js_name = delete)]
+    pub fn delete(&self, entity_type: &str, id: &str) -> Result<(), JsError> {
+        self.api.delete(entity_type, id).map_err(js)
+    }
+    #[wasm_bindgen(js_name = queryPage)]
+    pub fn query_page(&self, entity_type: &str, query_json: &str) -> Result<String, JsError> {
+        self.api.query_page(entity_type, query_json).map_err(js)
+    }
+    #[wasm_bindgen(js_name = queryIds)]
+    pub fn query_ids(&self, entity_type: &str, query_json: &str) -> Result<String, JsError> {
+        self.api.query_ids(entity_type, query_json).map_err(js)
+    }
+    #[wasm_bindgen(js_name = writeWhere)]
+    pub fn write_where(&self, op_json: &str) -> Result<String, JsError> {
+        self.api.write_where(op_json).map_err(js)
+    }
+    #[wasm_bindgen(js_name = writeBatch)]
+    pub fn write_batch(&self, batch_json: &str) -> Result<String, JsError> {
+        self.api.write_batch(batch_json).map_err(js)
+    }
+    #[wasm_bindgen(js_name = queryCapabilities)]
+    pub fn query_capabilities(&self) -> Result<String, JsError> {
+        self.api.query_capabilities().map_err(js)
+    }
+    #[wasm_bindgen(js_name = writeCapabilities)]
+    pub fn write_capabilities(&self) -> Result<String, JsError> {
+        self.api.write_capabilities().map_err(js)
+    }
+    #[wasm_bindgen(js_name = snapshot)]
+    pub fn snapshot(&self) -> Result<String, JsError> {
+        self.api.snapshot().map_err(js)
+    }
+    #[wasm_bindgen(js_name = bindCollection)]
+    pub fn bind_collection(&self, entity_type: &str, collection: &str) {
+        self.api.bind_collection(entity_type, collection);
+    }
+    #[wasm_bindgen]
+    pub fn clear(&self) {
+        self.api.clear();
+    }
 }

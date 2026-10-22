@@ -299,6 +299,14 @@ impl ServerApi {
         })
     }
 
+    pub fn fork_program(&self, program_json: &str) -> Result<Self, String> {
+        let schema: OrbitalSchema = parse(program_json, "program_json")?;
+        Ok(Self {
+            embedded: self.record(self.embedded.fork_program(schema))?,
+            last_error: Mutex::new(String::new()),
+        })
+    }
+
     /// The server underneath, for a native host that answers its asks from the program's own egress and grants.
     pub fn embedded(&self) -> &EmbeddedServer {
         &self.embedded

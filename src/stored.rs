@@ -231,6 +231,15 @@ impl ServerHandle {
         }
     }
 
+    pub fn fork_program(&self, program_json: &str) -> Result<Self, String> {
+        match self {
+            Self::Plain(api) => api.fork_program(program_json).map(Self::Plain),
+            Self::Stored(_) => {
+                Err("a server over its own store is not forked: open one per session".to_string())
+            }
+        }
+    }
+
     pub fn plain(resolved_schema_json: &str) -> Result<Self, String> {
         ServerApi::new(resolved_schema_json).map(Self::Plain)
     }
