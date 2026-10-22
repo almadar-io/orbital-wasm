@@ -239,8 +239,8 @@ fn a_stored_server_refuses_an_unknown_flight() {
 
 const STORED_ENV: &str = r#"{"DATA_BACKEND":"mock","NODE_ENV":"development"}"#;
 
-/// The trace the Node add-on (`orbital-node/tests/stored.test.mjs`) and the Python extension
-/// (`orbital-python/tests/test_stored.py`) must also produce for the same program over the memory store.
+/// The trace the Node add-on (`orbital-shell-typescript/bridges/node/tests/stored.test.mjs`) and the Python extension
+/// (`orbital-shell-python/bridges/native/tests/test_stored.py`) must also produce for the same program over the memory store.
 #[test]
 fn the_memory_store_trace_is_the_shared_golden() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stored");
