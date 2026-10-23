@@ -136,6 +136,18 @@ impl Kernel {
         u32::try_from(self.api.tick_count()).unwrap_or(u32::MAX)
     }
 
+    /// The config the kernel binds as `@config` for a registered trait, as JSON text.
+    #[wasm_bindgen(js_name = traitConfig)]
+    pub fn trait_config(&self, trait_name: &str) -> Result<String, JsError> {
+        self.api.trait_config(trait_name).map_err(js)
+    }
+
+    /// The kernel's dispatch mode for a registered trait, as JSON text.
+    #[wasm_bindgen(js_name = dispatchMode)]
+    pub fn dispatch_mode(&self, trait_name: &str) -> Result<String, JsError> {
+        self.api.dispatch_mode(trait_name).map_err(js)
+    }
+
     #[wasm_bindgen(js_name = getState)]
     pub fn get_state(&self, trait_name: &str, entity_id: Option<String>) -> String {
         self.api.get_state(trait_name, entity_id.as_deref())
@@ -251,6 +263,16 @@ impl Server {
     #[wasm_bindgen(js_name = osAllows)]
     pub fn os_allows(&self, requirement_json: &str) -> Result<bool, JsError> {
         self.api.os_allows(requirement_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = setOsAnchors)]
+    pub fn set_os_anchors(&self, anchors_json: &str) -> Result<String, JsError> {
+        self.api.set_os_anchors(anchors_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = osResolveArgs)]
+    pub fn os_resolve_args(&self, op: &str, args_json: &str) -> Result<String, JsError> {
+        self.api.os_resolve_args(op, args_json).map_err(js)
     }
 
     pub fn start(&self, orbital: &str, request_json: &str) -> Result<String, JsError> {
@@ -447,6 +469,12 @@ pub fn os_deferring_ops() -> Result<String, JsError> {
     api::os_deferring_ops().map_err(js)
 }
 
+/// The names of the `os/` operations whose keyed call is a stream, as a JSON array.
+#[wasm_bindgen(js_name = osStreamOps)]
+pub fn os_stream_ops() -> Result<String, JsError> {
+    api::os_stream_ops().map_err(js)
+}
+
 /// The `{ event, payload }` a deferred keyed `os/` call's outcome (`Settled`) fires on its call site, or `null`.
 #[wasm_bindgen(js_name = osCompletionEvent)]
 pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Result<String, JsError> {
@@ -587,8 +615,8 @@ pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, Js
 }
 
 #[wasm_bindgen(js_name = substrateCompletionEvent)]
-pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, outcome_json: &str) -> Result<String, JsError> {
-    api::substrate_completion_event(site_json, key, op, outcome_json).map_err(js)
+pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, args_json: &str, outcome_json: &str) -> Result<String, JsError> {
+    api::substrate_completion_event(site_json, key, op, args_json, outcome_json).map_err(js)
 }
 
 pub use orbital_core::embed::memory::MemoryStoreApi;

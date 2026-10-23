@@ -39,6 +39,7 @@ fn is_row_request(request: &IoRequestWire) -> bool {
             | IoRequestWire::ListRows { .. }
             | IoRequestWire::QueryRows { .. }
             | IoRequestWire::WriteRows { .. }
+            | IoRequestWire::CommitRows { .. }
             | IoRequestWire::CreateRow { .. }
             | IoRequestWire::WriteRow { .. }
             | IoRequestWire::DeleteRow { .. }

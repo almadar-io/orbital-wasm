@@ -186,6 +186,14 @@ impl KernelApi {
         self.embedded.tick_count()
     }
 
+    pub fn trait_config(&self, trait_name: &str) -> Result<String, String> {
+        self.record((|| to_json(&self.embedded.trait_config(trait_name)?))())
+    }
+
+    pub fn dispatch_mode(&self, trait_name: &str) -> Result<String, String> {
+        self.record((|| to_json(&self.embedded.dispatch_mode(trait_name)?))())
+    }
+
     pub fn get_state(&self, trait_name: &str, entity_id: Option<&str>) -> String {
         self.embedded.get_state(trait_name, entity_id)
     }
@@ -315,6 +323,16 @@ impl ServerApi {
     /// Whether the program's `os/` grants cover `requirement_json` (an `OsRequirement`).
     pub fn os_allows(&self, requirement_json: &str) -> Result<bool, String> {
         self.record(self.embedded.os_allows_json(requirement_json))
+    }
+
+    /// Place the program's anchored grants and arguments under the host's anchors; answers what grants nothing.
+    pub fn set_os_anchors(&self, anchors_json: &str) -> Result<String, String> {
+        self.record(self.embedded.set_os_anchors_json(anchors_json))
+    }
+
+    /// An `os/` call's arguments with its anchored parts resolved under the host's anchors (`Settled<args, OsError>`).
+    pub fn os_resolve_args(&self, op: &str, args_json: &str) -> Result<String, String> {
+        self.record(self.embedded.os_resolve_args_json(op, args_json))
     }
 
     pub fn live_item_delivered(&self, item_json: &str, viewer_json: &str, client_id: Option<&str>) -> Result<bool, String> {
@@ -502,6 +520,10 @@ pub fn os_deferring_ops() -> Result<String, String> {
     orbital_core::embed::os_deferring_ops_json()
 }
 
+pub fn os_stream_ops() -> Result<String, String> {
+    orbital_core::embed::os_stream_ops_json()
+}
+
 /// The `{ event, payload }` a deferred keyed `os/` call's outcome (`Settled`) fires on its call site, or `null`.
 pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Result<String, String> {
     orbital_core::embed::os_completion_event_json(site_json, key, outcome_json)
@@ -629,6 +651,6 @@ pub fn credential_seed_plan(declared_json: &str, held_json: &str, present_json: 
     orbital_core::credential_admin::seed_plan_json(declared_json, held_json, present_json)
 }
 
-pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, outcome_json: &str) -> Result<String, String> {
-    orbital_core::embed::substrate_completion_event_json(site_json, key, op, outcome_json)
+pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, args_json: &str, outcome_json: &str) -> Result<String, String> {
+    orbital_core::embed::substrate_completion_event_json(site_json, key, op, args_json, outcome_json)
 }
