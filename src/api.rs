@@ -23,6 +23,10 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> Result<T, St
     serde_json::from_str(json).map_err(|e| format!("parse {what}: {e}"))
 }
 
+fn side_of(side: &str) -> Result<orbital_core::protocols::ProtocolSide, String> {
+    serde_json::from_value(serde_json::Value::String(side.to_string())).map_err(|e| format!("parse side: {e}"))
+}
+
 impl KernelApi {
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, String> {
         let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
@@ -257,6 +261,16 @@ impl KernelApi {
         )
     }
 
+    /// The kernel's mounts for a host start on `side` (`client|server|process|start`), `MountSeed[]` as JSON.
+    pub fn boot_mounts(&self, side: &str) -> Result<String, String> {
+        self.record(side_of(side).and_then(|side| to_json(&self.embedded.boot_mounts(side))))
+    }
+
+    /// The kernel's mounts for a client opening `route_path`, `MountSeed[]` as JSON.
+    pub fn route_mounts(&self, route_path: &str) -> Result<String, String> {
+        self.record(to_json(&self.embedded.route_mounts(route_path)))
+    }
+
     pub fn unmount(&self, traits_json: &str) -> Result<(), String> {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json").map(|t| self.embedded.unmount(t)),
@@ -425,6 +439,16 @@ impl ServerApi {
             self.embedded
                 .set_capabilities_json(entity_type, query_json, write_json),
         )
+    }
+
+    /// The kernel's mounts for a host start on `side` (`client|server|process|start`), `MountSeed[]` as JSON.
+    pub fn boot_mounts(&self, side: &str) -> Result<String, String> {
+        self.record(side_of(side).and_then(|side| to_json(&self.embedded.boot_mounts(side))))
+    }
+
+    /// The kernel's mounts for a client opening `route_path`, `MountSeed[]` as JSON.
+    pub fn route_mounts(&self, route_path: &str) -> Result<String, String> {
+        self.record(to_json(&self.embedded.route_mounts(route_path)))
     }
 
     /// The traits whose mount-scoped ticks fire (`string[]` as JSON): the union of what the host's clients mounted.

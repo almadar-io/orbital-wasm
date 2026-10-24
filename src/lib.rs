@@ -203,6 +203,16 @@ impl Kernel {
         self.api.mount(traits_json).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = bootMounts)]
+    pub fn boot_mounts(&self, side: &str) -> Result<String, JsError> {
+        self.api.boot_mounts(side).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = routeMounts)]
+    pub fn route_mounts(&self, route_path: &str) -> Result<String, JsError> {
+        self.api.route_mounts(route_path).map_err(js)
+    }
+
     pub fn unmount(&self, traits_json: &str) -> Result<(), JsError> {
         self.api.unmount(traits_json).map_err(js)
     }
@@ -319,6 +329,16 @@ impl Server {
     #[wasm_bindgen(js_name = getState)]
     pub fn get_state(&self, trait_name: &str, entity_id: Option<String>) -> String {
         self.api.get_state(trait_name, entity_id.as_deref())
+    }
+
+    #[wasm_bindgen(js_name = bootMounts)]
+    pub fn boot_mounts(&self, side: &str) -> Result<String, JsError> {
+        self.api.boot_mounts(side).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = routeMounts)]
+    pub fn route_mounts(&self, route_path: &str) -> Result<String, JsError> {
+        self.api.route_mounts(route_path).map_err(js)
     }
 
     #[wasm_bindgen(js_name = setManagedProgram)]

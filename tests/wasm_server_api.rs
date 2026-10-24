@@ -295,3 +295,47 @@ fn the_managed_program_is_set_by_json_and_a_malformed_one_is_refused() {
     let err = api.set_managed_program("not json").unwrap_err();
     assert!(err.contains("program_json"), "{err}");
 }
+
+fn endpoint_program() -> Value {
+    json!({
+        "name": "endpoints",
+        "orbitals": [{
+            "name": "Main",
+            "entity": { "name": "Note", "persistence": "persistent", "collection": "notes", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [
+                { "name": "ViewT", "linkedEntity": "Note", "stateMachine": { "states": [{ "name": "a", "isInitial": true }], "transitions": [{ "from": "a", "to": "a", "event": "INIT", "effects": [] }] } },
+                { "name": "HttpT", "linkedEntity": "Note", "stateMachine": { "states": [{ "name": "a", "isInitial": true }], "transitions": [{ "from": "a", "to": "a", "event": "INIT", "effects": [] }] } }
+            ],
+            "pages": [
+                { "name": "Home", "path": "/", "traits": [{ "ref": "ViewT" }] },
+                { "name": "Api", "path": "", "protocol": "http", "traits": [{ "ref": "HttpT" }] }
+            ]
+        }]
+    })
+}
+
+#[test]
+fn the_boot_mounts_are_the_kernels_for_the_side_and_never_a_route_trait() {
+    let api = ServerApi::new(&endpoint_program().to_string()).unwrap();
+    let server: Value = serde_json::from_str(&api.boot_mounts("server").unwrap()).unwrap();
+    assert_eq!(server, json!([{ "trait": "HttpT", "event": "INIT" }]));
+}
+
+#[test]
+fn control_the_process_side_boots_no_http_trait_and_an_unknown_side_is_refused() {
+    let api = ServerApi::new(&endpoint_program().to_string()).unwrap();
+    assert_eq!(api.boot_mounts("process").unwrap(), "[]");
+    let route: Value = serde_json::from_str(&api.route_mounts("/").unwrap()).unwrap();
+    assert_eq!(route, json!([{ "trait": "ViewT", "event": "INIT" }]));
+    assert!(api.boot_mounts("everywhere").is_err());
+    assert!(api.last_error().contains("parse side"));
+}
+
+#[test]
+fn a_kernel_opening_a_route_gets_only_that_routes_traits_and_the_client_side_boots_none() {
+    let kernel = orbital_wasm::api::KernelApi::new(&endpoint_program().to_string(), "c1").unwrap();
+    let route: Value = serde_json::from_str(&kernel.route_mounts("/").unwrap()).unwrap();
+    assert_eq!(route, json!([{ "trait": "ViewT", "event": "INIT" }]));
+    assert_eq!(kernel.route_mounts("/missing").unwrap(), "[]");
+    assert_eq!(kernel.boot_mounts("client").unwrap(), "[]");
+}
