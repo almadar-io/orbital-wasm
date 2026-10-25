@@ -5,6 +5,7 @@
 //! `last_error`.
 
 pub mod api;
+pub mod credentials;
 pub mod http;
 pub mod oauth;
 pub mod stored;
@@ -383,15 +384,126 @@ impl Server {
         self.api.set_tick_mount(traits_json).map_err(js)
     }
 
-    /// Mock-seed the `[runtime]` entities the kernel holds itself (a preview host, per fresh kernel).
-    #[wasm_bindgen(js_name = seedRuntimeMock)]
-    pub fn seed_runtime_mock(&self, viewer_id: Option<String>) {
-        self.api.seed_runtime_mock(viewer_id);
-    }
-
     #[wasm_bindgen(js_name = lastError)]
     pub fn last_error(&self) -> String {
         self.api.last_error()
+    }
+}
+
+/// The encrypted credential store for a host whose rows answer asynchronously: the host lists its rows and `load`s them,
+/// runs an operation, then applies `takeWrites()` to its medium in order. See `credentials::VaultApi`.
+#[wasm_bindgen]
+pub struct CredentialVault {
+    api: credentials::VaultApi,
+}
+
+#[wasm_bindgen]
+impl CredentialVault {
+    #[wasm_bindgen(constructor)]
+    pub fn new(master_key: Option<String>, previous_key: Option<String>) -> Result<CredentialVault, JsError> {
+        credentials::VaultApi::new(master_key.as_deref(), previous_key.as_deref())
+            .map(|api| CredentialVault { api })
+            .map_err(js)
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn enabled(&self) -> bool {
+        self.api.enabled()
+    }
+
+    pub fn load(&self, rows_json: &str) -> Result<u32, JsError> {
+        self.api.load(rows_json).map(|count| count as u32).map_err(js)
+    }
+
+    pub fn resolve(&self, name: &str, principal: Option<String>) -> Result<Option<String>, JsError> {
+        self.api.resolve(name, principal.as_deref()).map_err(js)
+    }
+
+    pub fn label(&self, name: &str, principal: Option<String>) -> Result<Option<String>, JsError> {
+        self.api.label(name, principal.as_deref()).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = snapshotEnv)]
+    pub fn snapshot_env(&self) -> Result<String, JsError> {
+        self.api.snapshot_env().map_err(js)
+    }
+
+    pub fn entries(&self, principal: Option<String>) -> Result<String, JsError> {
+        self.api.entries(principal.as_deref()).map_err(js)
+    }
+
+    pub fn listing(&self) -> Result<String, JsError> {
+        self.api.listing().map_err(js)
+    }
+
+    pub fn set(
+        &self,
+        service: &str,
+        name: &str,
+        value: &str,
+        principal: Option<String>,
+        label: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .set(service, name, value, principal.as_deref(), label.as_deref())
+            .map_err(js)
+    }
+
+    pub fn replace(&self, name: &str, value: &str, principal: Option<String>) -> Result<String, JsError> {
+        self.api.replace(name, value, principal.as_deref()).map_err(js)
+    }
+
+    pub fn persist(
+        &self,
+        name: &str,
+        value: &str,
+        principal: Option<String>,
+        label: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .persist(name, value, principal.as_deref(), label.as_deref())
+            .map_err(js)
+    }
+
+    pub fn remove(&self, name: &str, principal: Option<String>) -> Result<bool, JsError> {
+        self.api.remove(name, principal.as_deref()).map_err(js)
+    }
+
+    pub fn rotate(&self) -> Result<String, JsError> {
+        self.api.rotate().map_err(js)
+    }
+
+    pub fn hold(
+        &self,
+        name: &str,
+        value: &str,
+        expires_at: f64,
+        now: f64,
+        principal: Option<String>,
+    ) -> Result<(), JsError> {
+        self.api
+            .hold(name, value, expires_at, now, principal.as_deref())
+            .map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = takeBegin)]
+    pub fn take_begin(&self, name: &str, principal: Option<String>) -> Result<Option<String>, JsError> {
+        self.api.take_begin(name, principal.as_deref()).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = takeFinish)]
+    pub fn take_finish(&self, ticket: f64, now: f64) -> Result<Option<String>, JsError> {
+        self.api.take_finish(ticket, now).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = takeCancel)]
+    pub fn take_cancel(&self, ticket: f64) -> Result<(), JsError> {
+        self.api.take_cancel(ticket).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = takeWrites)]
+    pub fn take_writes(&self) -> Result<String, JsError> {
+        self.api.take_writes().map_err(js)
     }
 }
 

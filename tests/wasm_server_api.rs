@@ -237,37 +237,6 @@ fn a_stored_server_refuses_an_unknown_flight() {
     assert!(!server.abandon(9));
 }
 
-const STORED_ENV: &str = r#"{"DATA_BACKEND":"mock","NODE_ENV":"development"}"#;
-
-/// The trace the Node add-on (`orbital-shell-typescript/bridges/node/tests/stored.test.mjs`) and the Python extension
-/// (`orbital-shell-python/bridges/native/tests/test_stored.py`) must also produce for the same program over the memory store.
-#[test]
-fn the_memory_store_trace_is_the_shared_golden() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stored");
-    let schema = std::fs::read_to_string(dir.join("notes.schema.json")).unwrap();
-    let env: std::collections::HashMap<String, String> = serde_json::from_str(STORED_ENV).unwrap();
-    let server = orbital_wasm::stored::ServerHandle::from_env(&schema, &env).unwrap();
-    let start = progress(&server.start("Main", &save()).unwrap());
-    let state = server.api().get_state("Draft", None);
-    let trace = json!({ "start": start, "state": state, "inFlight": server.api().in_flight() });
-    let golden = dir.join("notes.trace.json");
-    if std::env::var("STORED_GOLDEN_WRITE").is_ok() {
-        std::fs::write(&golden, serde_json::to_string_pretty(&trace).unwrap() + "\n").unwrap();
-    }
-    let expected: Value = serde_json::from_str(&std::fs::read_to_string(&golden).unwrap()).unwrap();
-    assert_eq!(trace, expected);
-    assert_eq!(trace["start"]["status"], "done");
-}
-
-#[test]
-fn control_a_production_environment_refuses_the_memory_store() {
-    let schema = schema().to_string();
-    let env: std::collections::HashMap<String, String> =
-        serde_json::from_str(r#"{"DATA_BACKEND":"mock"}"#).unwrap();
-    let err = orbital_wasm::stored::ServerHandle::from_env(&schema, &env).err().expect("refused");
-    assert!(err.contains("not permitted"), "{err}");
-}
-
 #[test]
 fn the_installed_language_exports_as_a_bundle_a_host_without_node_modules_installs() {
     let bundle = orbital_core::language_data::language_bundle_json().unwrap();

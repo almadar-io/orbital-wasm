@@ -1,4 +1,4 @@
-//! A server whose kernel answers its own row requests from a store the host selects, so the host answers only the
+//! A server whose kernel answers its own row requests from a store the host gives it, so the host answers only the
 //! rest (http, `os/`, secrets, credentials, clock, random, services). The wire is [`ServerApi`]'s: a flight that
 //! still waits on the host lists only the requests the host owns, and `resume` takes only those answers.
 
@@ -79,30 +79,6 @@ impl StoredServer {
             held: Mutex::new(HashMap::new()),
             held_resolve: Mutex::new(HashMap::new()),
         })
-    }
-
-    /// The server over the store the environment selects (`DATA_BACKEND`, `DATABASE_URL`, `COUCHDB_URL`, the Firebase
-    /// variables: the `@almadar/db` contract), its drivers speaking over the host's network.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn from_env(
-        resolved_schema_json: &str,
-        env: &HashMap<String, String>,
-    ) -> Result<Self, String> {
-        use orbital_core::runtime::native_transport::UreqTransport;
-        use orbital_core::runtime::store_config::row_store_from_env;
-        let store = row_store_from_env(
-            &|name| env.get(name).cloned(),
-            &|path| std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}")),
-            Arc::new(UreqTransport::unchecked()),
-        )?;
-        Self::new(
-            resolved_schema_json,
-            store.source,
-            StoreCapabilities {
-                query: store.query,
-                write: store.write,
-            },
-        )
     }
 
     /// Everything of the server that is not a flight: state, mounts, messages, grants, the last error.
@@ -216,84 +192,46 @@ impl StoredServer {
     }
 }
 
-/// A server a native binding holds: the plain one, whose host answers every ask, or one that answers its own rows.
-pub enum ServerHandle {
-    Plain(ServerApi),
-    Stored(StoredServer),
-}
+/// A server a native binding holds: the host answers every ask.
+pub struct ServerHandle(ServerApi);
 
 impl ServerHandle {
-    /// A plain server's fork ([`ServerApi::fork`]); a server that answers its own rows from a store holds that
-    /// store's session and is not forked.
+    /// The server's fork ([`ServerApi::fork`]).
     pub fn fork(&self) -> Result<Self, String> {
-        match self {
-            Self::Plain(api) => api.fork().map(Self::Plain),
-            Self::Stored(_) => Err("a server over its own store is not forked: open one per session".to_string()),
-        }
+        self.0.fork().map(Self)
     }
 
     pub fn fork_program(&self, program_json: &str) -> Result<Self, String> {
-        match self {
-            Self::Plain(api) => api.fork_program(program_json).map(Self::Plain),
-            Self::Stored(_) => {
-                Err("a server over its own store is not forked: open one per session".to_string())
-            }
-        }
+        self.0.fork_program(program_json).map(Self)
     }
 
     pub fn plain(resolved_schema_json: &str) -> Result<Self, String> {
-        ServerApi::new(resolved_schema_json).map(Self::Plain)
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn from_env(
-        resolved_schema_json: &str,
-        env: &HashMap<String, String>,
-    ) -> Result<Self, String> {
-        StoredServer::from_env(resolved_schema_json, env).map(Self::Stored)
+        ServerApi::new(resolved_schema_json).map(Self)
     }
 
     /// Everything of the server that is not a flight.
     pub fn api(&self) -> &ServerApi {
-        match self {
-            Self::Plain(api) => api,
-            Self::Stored(stored) => stored.api(),
-        }
+        &self.0
     }
 
     pub fn start(&self, orbital: &str, request_json: &str) -> Result<String, String> {
-        match self {
-            Self::Plain(api) => api.start(orbital, request_json),
-            Self::Stored(stored) => stored.start(orbital, request_json),
-        }
+        self.0.start(orbital, request_json)
     }
 
     pub fn resume(&self, flight: u64, replies_json: &str) -> Result<String, String> {
-        match self {
-            Self::Plain(api) => api.resume(flight, replies_json),
-            Self::Stored(stored) => stored.resume(flight, replies_json),
-        }
+        self.0.resume(flight, replies_json)
     }
 
     pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
-        match self {
-            Self::Plain(api) => api.resolve_rows(ref_json, viewer_json),
-            Self::Stored(stored) => stored.resolve_rows(ref_json, viewer_json),
-        }
+        self.0.resolve_rows(ref_json, viewer_json)
     }
 
     pub fn resume_resolve(&self, flight: u64, replies_json: &str) -> Result<String, String> {
-        match self {
-            Self::Plain(api) => api.resume_resolve(flight, replies_json),
-            Self::Stored(stored) => stored.resume_resolve(flight, replies_json),
-        }
+        self.0.resume_resolve(flight, replies_json)
     }
 
     pub fn abandon(&self, flight: u64) -> bool {
-        match self {
-            Self::Plain(api) => api.abandon(flight),
-            Self::Stored(stored) => stored.abandon(flight),
-        }
+        self.0.abandon(flight)
     }
 }
 

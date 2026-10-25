@@ -459,11 +459,6 @@ impl ServerApi {
         )
     }
 
-    /// Mock-seed the `[runtime]` entities the kernel holds itself, owner columns stamped with `viewer_id`.
-    pub fn seed_runtime_mock(&self, viewer_id: Option<String>) {
-        self.embedded.seed_runtime_mock(viewer_id);
-    }
-
     pub fn last_error(&self) -> String {
         self.last_error
             .lock()
