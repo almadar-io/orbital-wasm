@@ -9,11 +9,9 @@ description = "The embedded Almadar kernel for JavaScript hosts (npm @almadar/ke
 [features]
 default = ["full"]
 # The full kernel: Node hosts and tools. The client build (`--no-default-features`) is what a browser loads.
-full = ["wire-drivers", "verify"]
+full = ["wire-drivers"]
 # Postgres and Redis over raw sockets; a browser cannot open them.
 wire-drivers = ["orbital-core/wire-drivers"]
-# The verifier's planner and verdict exports, called from Node harnesses only.
-verify = []
 
 [lib]
 name = "orbital_wasm"

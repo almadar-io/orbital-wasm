@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the wasm32 kernel and runs wasm-bindgen into ./pkg (the full kernel: Node hosts and tools) and ./pkg-client
-# (the client build: a browser host, without the server-role drivers and the verifier exports).
+# (the client build: a browser host, without the server-role drivers).
 # Run from orbital-wasm/js. `sh scripts/build.sh full` or `sh scripts/build.sh client` builds one; no argument builds both.
 set -eu
 cd "$(dirname "$0")/.."

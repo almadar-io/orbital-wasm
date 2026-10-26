@@ -4,19 +4,9 @@ import { loadPkg } from './pkg.mjs';
 
 const client = process.env.KERNEL_PKG !== undefined;
 
-test('the client build keeps what a browser host runs and leaves out the Node-only verifier exports', { skip: !client }, async () => {
+test('the client build keeps what a browser host runs', { skip: !client }, async () => {
   const pkg = await loadPkg();
   for (const name of ['Kernel', 'Server', 'installLanguage', 'httpDriverStart', 'httpDriverResume', 'oauthAuthorizePlan', 'osGlobMatches', 'tabUrlMatches', 'evaluateMany', 'scopeRows']) {
     assert.notEqual(pkg[name], undefined, `${name} is missing from the client build`);
-  }
-  for (const name of ['verifyPlan', 'verifyExpect', 'verifyJudge', 'verifyCredit', 'verifyAffordance', 'verifyTransientProbe', 'verifyReplay']) {
-    assert.equal(pkg[name], undefined, `${name} is in the client build`);
-  }
-});
-
-test('the full build carries the verifier exports', { skip: client }, async () => {
-  const pkg = await loadPkg();
-  for (const name of ['verifyPlan', 'verifyExpect', 'verifyJudge', 'verifyCredit', 'verifyAffordance', 'verifyTransientProbe', 'verifyReplay']) {
-    assert.equal(typeof pkg[name], 'function', `${name} is missing from the full build`);
   }
 });

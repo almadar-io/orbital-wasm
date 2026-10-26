@@ -514,64 +514,6 @@ pub fn install_language(bundle_json: &str) -> Result<(), JsError> {
     api::install_language(bundle_json).map_err(js)
 }
 
-/// The verifier's planner: what to fire for a resolved program (`PlanOutcome` as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyPlan)]
-pub fn verify_plan(resolved_schema_json: &str, options_json: &str) -> String {
-    api::verify_plan(resolved_schema_json, options_json)
-}
-
-/// The oracle of one planned step (`StepWire` in, `Expectation` out, as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyExpect)]
-pub fn verify_expect(step_json: &str) -> Result<String, JsError> {
-    api::verify_expect(step_json).map_err(js)
-}
-
-/// The verdict on one observed step (`Expectation` and `Observation` in, `VerdictWire` out, as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyJudge)]
-pub fn verify_judge(expectation_json: &str, observation_json: &str) -> Result<String, JsError> {
-    api::verify_judge(expectation_json, observation_json).map_err(js)
-}
-
-/// A fired transition's `@ensures` judged on one run (S-expression list and `PropositionObservation` in,
-/// `PropositionVerdict` out, as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyProposition)]
-pub fn verify_proposition(ensures_json: &str, observation_json: &str) -> Result<String, JsError> {
-    api::verify_proposition(ensures_json, observation_json).map_err(js)
-}
-
-/// The failure-route steps of a walk credited from the hops other steps' dispatches fired
-/// (`CreditStep[]` in, `Credit[]` out, as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyCredit)]
-pub fn verify_credit(steps_json: &str) -> Result<String, JsError> {
-    api::verify_credit(steps_json).map_err(js)
-}
-
-/// A rendered affordance the host found, planned (`AffordanceQuery` in, `AffordanceStep` or `null` out, as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyAffordance)]
-pub fn verify_affordance(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
-    api::verify_affordance(resolved_schema_json, query_json, options_json).map_err(js)
-}
-
-/// The forced failure of a transient failure arm (`TransientQuery` in, `TransientOutcome` or `null` out, as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyTransientProbe)]
-pub fn verify_transient_probe(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
-    api::verify_transient_probe(resolved_schema_json, query_json, options_json).map_err(js)
-}
-
-/// The hops that place a fresh machine in a state (`ReplayQuery` in, `PreambleEvent[]` or `null` out, as JSON).
-#[cfg(feature = "verify")]
-#[wasm_bindgen(js_name = verifyReplay)]
-pub fn verify_replay(resolved_schema_json: &str, query_json: &str, options_json: &str) -> Result<String, JsError> {
-    api::verify_replay(resolved_schema_json, query_json, options_json).map_err(js)
-}
-
 /// The `http` effect's sans-I/O driver (`orbital_core::runtime::http_request`) over JSON strings; each
 /// returns what `http::*` returns, or throws a JS `Error` for a malformed argument.
 #[wasm_bindgen(js_name = httpDriverStart)]
