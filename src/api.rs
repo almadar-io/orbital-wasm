@@ -105,6 +105,14 @@ impl KernelApi {
         })())
     }
 
+    /// The mount a reconnecting client posts to rebuild its session from the frames and states it holds (`MountSeed[]` in).
+    pub fn reseed_leg(&self, seeds_json: &str, entity_id: Option<&str>) -> Result<String, String> {
+        self.record((|| {
+            let seeds: Vec<MountSeed> = parse(seeds_json, "seeds_json")?;
+            to_json(&self.embedded.reseed_leg(&seeds, entity_id))
+        })())
+    }
+
     /// The base a posted leg's answer is folded against; `None` when the leg carried no rows.
     pub fn fold_base(
         &self,

@@ -70,6 +70,11 @@ impl Kernel {
         self.api.stateful_leg(leg_json).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = reseedLeg)]
+    pub fn reseed_leg(&self, seeds_json: &str, entity_id: Option<String>) -> Result<String, JsError> {
+        self.api.reseed_leg(seeds_json, entity_id.as_deref()).map_err(js)
+    }
+
     /// `undefined` when the leg carried no rows to fold against.
     #[wasm_bindgen(js_name = foldBase)]
     pub fn fold_base(
