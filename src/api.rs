@@ -380,6 +380,26 @@ impl ServerApi {
         self.record(self.embedded.resume_json(flight, replies_json))
     }
 
+    /// The oldest queued request, started now the lane is free; a `NextWire` as JSON, or `null`.
+    pub fn next(&self) -> Result<String, String> {
+        self.record(self.embedded.next_json())
+    }
+
+    /// Whether `flight` is a dispatch parked holding the lane.
+    pub fn holds_lane(&self, flight: u64) -> bool {
+        self.embedded.holds_lane(flight)
+    }
+
+    /// A live stream of `client`'s session opened; the id closes it.
+    pub fn open_session_stream(&self, client: &str) -> u64 {
+        self.embedded.open_session_stream(client)
+    }
+
+    /// The live stream `id` dropped.
+    pub fn close_session_stream(&self, id: u64) -> bool {
+        self.embedded.close_session_stream(id)
+    }
+
     /// Resolve a row-set reference (`RowSetRef` as JSON) for a viewer (a user as JSON) through the host-answered
     /// store; a `ResolveProgressWire` as JSON.
     pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {

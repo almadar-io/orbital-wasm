@@ -307,6 +307,27 @@ impl Server {
             .map_err(js)
     }
 
+    /// The oldest queued request, started now the lane is free (`NextWire` JSON), or `null`.
+    pub fn next(&self) -> Result<String, JsError> {
+        self.api.next().map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = holdsLane)]
+    pub fn holds_lane(&self, flight: f64) -> Result<bool, JsError> {
+        Ok(self.api.holds_lane(flight_id(flight)?))
+    }
+
+    /// A live stream of `client`'s session opened (EXEC-DIST-9); the id closes it.
+    #[wasm_bindgen(js_name = openSessionStream)]
+    pub fn open_session_stream(&self, client: &str) -> f64 {
+        self.api.open_session_stream(client) as f64
+    }
+
+    #[wasm_bindgen(js_name = closeSessionStream)]
+    pub fn close_session_stream(&self, id: f64) -> Result<bool, JsError> {
+        Ok(self.api.close_session_stream(flight_id(id)?))
+    }
+
     #[wasm_bindgen(js_name = liveItemDelivered)]
     pub fn live_item_delivered(&self, item_json: &str, viewer_json: &str, client_id: Option<String>) -> Result<bool, JsError> {
         self.api.live_item_delivered(item_json, viewer_json, client_id.as_deref()).map_err(js)

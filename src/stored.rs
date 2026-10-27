@@ -95,6 +95,31 @@ impl StoredServer {
         self.go_on(flight, replies_json, Flight::Dispatch)
     }
 
+    /// [`ServerApi::next`], the started request's row asks answered from the store.
+    pub fn next(&self) -> Result<String, String> {
+        let next: Value = serde_json::from_str(&self.api.next()?).map_err(|e| format!("parse next: {e}"))?;
+        let Value::Object(mut started) = next else {
+            return json(&next);
+        };
+        if let Some(progress) = started.remove("progress") {
+            let pumped = self.pump(json(&progress)?, Flight::Dispatch)?;
+            started.insert("progress".to_string(), serde_json::from_str(&pumped).map_err(|e| format!("parse progress: {e}"))?);
+        }
+        json(&started)
+    }
+
+    pub fn holds_lane(&self, flight: u64) -> bool {
+        self.api.holds_lane(flight)
+    }
+
+    pub fn open_session_stream(&self, client: &str) -> u64 {
+        self.api.open_session_stream(client)
+    }
+
+    pub fn close_session_stream(&self, id: u64) -> bool {
+        self.api.close_session_stream(id)
+    }
+
     pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
         let progress = self.api.resolve_rows(ref_json, viewer_json)?;
         self.pump(progress, Flight::Resolve)
@@ -220,6 +245,22 @@ impl ServerHandle {
 
     pub fn resume(&self, flight: u64, replies_json: &str) -> Result<String, String> {
         self.0.resume(flight, replies_json)
+    }
+
+    pub fn next(&self) -> Result<String, String> {
+        self.0.next()
+    }
+
+    pub fn holds_lane(&self, flight: u64) -> bool {
+        self.0.holds_lane(flight)
+    }
+
+    pub fn open_session_stream(&self, client: &str) -> u64 {
+        self.0.open_session_stream(client)
+    }
+
+    pub fn close_session_stream(&self, id: u64) -> bool {
+        self.0.close_session_stream(id)
     }
 
     pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
