@@ -489,7 +489,7 @@ fn the_client_kernel_paints_i18n_from_the_catalogs_the_host_sets() {
     let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
     kernel.set_messages(r#"["en"]"#, r#"{"en":{"site:hero.title":"Hello"}}"#).unwrap();
     let wire = parsed(&kernel.dispatch("HomePage", None, "INIT", None).unwrap());
-    assert!(wire["response"]["clientEffects"].to_string().contains("\"Hello\""), "{wire:#}");
+    assert!(wire["response"]["clientEffectsByTrait"].to_string().contains("\"Hello\""), "{wire:#}");
 }
 
 #[test]
