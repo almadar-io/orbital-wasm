@@ -186,6 +186,12 @@ impl Kernel {
         self.api.set_record_entity_after(record);
     }
 
+    /// Carry each tick's `effectResults` on the frame response, for a verifier. Off by default (P-015).
+    #[wasm_bindgen(js_name = setFrameEffectResults)]
+    pub fn set_frame_effect_results(&self, carry: bool) {
+        self.api.set_frame_effect_results(carry);
+    }
+
     /// A row-set reference resolved against this kernel's rows for its current user (`{ rows, total }`).
     #[wasm_bindgen(js_name = resolveRows)]
     pub fn resolve_rows(&self, ref_json: &str) -> Result<String, JsError> {

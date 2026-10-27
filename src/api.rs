@@ -234,6 +234,11 @@ impl KernelApi {
         self.embedded.set_record_entity_after(record);
     }
 
+    /// Carry each tick's `effectResults` on the frame response, for a verifier (P-015).
+    pub fn set_frame_effect_results(&self, carry: bool) {
+        self.embedded.set_frame_effect_results(carry);
+    }
+
     pub fn resolve_rows(&self, ref_json: &str) -> Result<String, String> {
         self.record(
             parse::<orbital_core::runtime::row_query::RowSetRef>(ref_json, "ref_json")
