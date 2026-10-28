@@ -231,23 +231,25 @@ fn a_malformed_context_or_expression_list_is_a_typed_error_not_an_outcome() {
 }
 
 #[test]
-fn guards_are_decided_in_one_crossing_by_kernel_truthiness_and_a_failing_guard_is_its_own_error() {
-    let context = json!({ "entity": { "qty": 3, "tags": [], "name": "" } }).to_string();
+fn guards_are_decided_in_one_crossing_as_booleans_and_a_failing_guard_is_its_own_error() {
+    let context = json!({ "entity": { "qty": 3, "tags": [], "name": "", "ok": true } }).to_string();
     let guards = json!([
         [">", "@entity.qty", 1],
         [">", "@entity.qty", 9],
         ["/", 1],
         "@entity.tags",
         "@entity.name",
-        "@entity.qty"
+        "@entity.qty",
+        "@entity.ok"
     ]);
     let verdicts = pj(&evaluate_guards(&context, &guards.to_string()).unwrap());
     assert_eq!(verdicts[0], json!({ "kind": "value", "value": true }));
     assert_eq!(verdicts[1], json!({ "kind": "value", "value": false }));
     assert_eq!(verdicts[2]["kind"], "error");
-    assert_eq!(verdicts[3], json!({ "kind": "value", "value": false }));
-    assert_eq!(verdicts[4], json!({ "kind": "value", "value": false }));
-    assert_eq!(verdicts[5], json!({ "kind": "value", "value": true }));
+    for not_boolean in [3, 4, 5] {
+        assert_eq!(verdicts[not_boolean]["kind"], "error", "a guard is a boolean, never truthiness: {}", verdicts[not_boolean]);
+    }
+    assert_eq!(verdicts[6], json!({ "kind": "value", "value": true }), "control: a boolean guard");
 }
 
 fn traced(context: Value, expression: Value) -> Value {
@@ -423,7 +425,7 @@ fn a_row_binding_term_folds_to_a_scalar_a_list_or_a_typed_refusal() {
 }
 
 #[test]
-fn a_string_operator_reads_an_absent_value_as_empty_text_and_control_a_present_string_null_stays() {
+fn a_string_operator_refuses_an_absent_value_and_control_a_present_string_null_stays() {
     let context = json!({ "payload": { "present": "null", "n": 3 } });
     let out = evaluated(
         &context,
@@ -434,14 +436,15 @@ fn a_string_operator_reads_an_absent_value_as_empty_text_and_control_a_present_s
             ["str/trim", "@payload.missing"],
             ["str/concat", "a", "@payload.present"],
             ["str/upper", "@payload.present"],
-            ["str/concat", "n=", "@payload.n"]
+            ["str/concat", "n=", "@payload.n"],
+            ["str/upper", ["default", "@payload.missing", ""]]
         ]),
     );
-    let values: Vec<&Value> = out.iter().map(value_of).collect();
-    assert_eq!(
-        values,
-        vec![&json!("ab"), &json!(""), &json!(0), &json!(""), &json!("anull"), &json!("NULL"), &json!("n=3")]
-    );
+    for absent in &out[..4] {
+        assert_eq!(absent["kind"], "error", "an absent value is not a string (EXEC-EVAL-2): {absent}");
+    }
+    let values: Vec<&Value> = out[4..].iter().map(value_of).collect();
+    assert_eq!(values, vec![&json!("anull"), &json!("NULL"), &json!("n=3"), &json!("")], "controls: present values, and `default` says what absence means");
 }
 
 #[test]

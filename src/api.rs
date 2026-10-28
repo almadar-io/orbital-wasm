@@ -512,6 +512,14 @@ pub fn os_glob_matches(glob: &str, path: &str) -> bool {
     orbital_core::embed::os_glob_matches(glob, path)
 }
 
+/// The typed event request a `program/dispatch` call names (`EventRequest::from_dispatch`), as JSON: the payload and
+/// the option record in, the request the kernel would dispatch out. A record that is no event request is the `Err`.
+pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<String, String> {
+    let payload: serde_json::Value = parse(payload_json, "payload_json")?;
+    let options: serde_json::Map<String, serde_json::Value> = parse(options_json, "options_json")?;
+    to_json(&orbital_core::EventRequest::from_dispatch(payload, |key| options.get(key).cloned())?)
+}
+
 /// Whether the Chrome match pattern `pattern` matches `url`.
 pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
     orbital_core::embed::tab_url_matches(pattern, url)

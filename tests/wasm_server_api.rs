@@ -186,6 +186,16 @@ fn a_browser_host_matches_tab_urls_with_the_kernels_one_rule() {
     assert!(!tab_url_matches("not a pattern", "https://example.com/"));
 }
 
+#[test]
+fn a_host_parses_a_dispatch_request_with_the_kernels_typed_parse() {
+    use orbital_wasm::api::parse_event_request;
+    let options = json!({ "event": "SAVE", "targetTrait": "Draft", "entityId": "", "viewer": { "id": "u1" } }).to_string();
+    let parsed: Value = serde_json::from_str(&parse_event_request("{\"n\":\"x\"}", &options).unwrap()).unwrap();
+    assert_eq!(parsed, json!({ "event": "SAVE", "payload": { "n": "x" }, "targetTrait": "Draft", "user": { "id": "u1" } }));
+    let refused = parse_event_request("{}", "{}").unwrap_err();
+    assert!(refused.starts_with("program/dispatch: not an event request: "), "{refused}");
+}
+
 fn stored(program: &Value) -> (StoredServer, Arc<InMemoryEntityCache>) {
     let cache = Arc::new(InMemoryEntityCache::new());
     let source: Arc<dyn EntitySource> = cache.clone();
