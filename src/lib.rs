@@ -14,8 +14,8 @@ use api::{KernelApi, ServerApi};
 
 use wasm_bindgen::prelude::*;
 
-fn js(message: String) -> JsError {
-    JsError::new(&message)
+fn js(error: impl std::fmt::Display) -> JsError {
+    JsError::new(&error.to_string())
 }
 
 #[wasm_bindgen]

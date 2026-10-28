@@ -137,7 +137,10 @@ fn control_a_changed_step_breaks_the_golden() {
 #[test]
 fn an_empty_schema_is_refused() {
     let err = KernelApi::new(r#"{"name":"Empty","orbitals":[]}"#, "c").err();
-    assert_eq!(err.as_deref(), Some("resolved schema declares no orbitals"));
+    assert!(matches!(
+        err,
+        Some(orbital_wasm::api::ApiError::Entry(orbital_core::runtime::kernel::EntryError::NoOrbitals))
+    ));
 }
 
 #[test]

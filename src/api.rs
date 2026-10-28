@@ -4,11 +4,34 @@
 
 use orbital_core::effects::MountSeed;
 use orbital_core::embed::{parse_theme_mode, EmbeddedKernel, EmbeddedServer, FoldBase};
+use orbital_core::runtime::kernel::EntryError;
 use orbital_core::runtime::TraitSnapshot;
 use orbital_core::{EventResponse, OrbitalSchema, Value};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Mutex;
+
+/// Why a kernel or server entry refused to start: the program did not parse or serialize, or the kernel refused it.
+#[derive(Debug)]
+pub enum ApiError {
+    Marshal(String),
+    Entry(EntryError),
+}
+
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Marshal(message) => f.write_str(message),
+            Self::Entry(error) => error.fmt(f),
+        }
+    }
+}
+
+impl From<EntryError> for ApiError {
+    fn from(error: EntryError) -> Self {
+        Self::Entry(error)
+    }
+}
 
 pub struct KernelApi {
     embedded: EmbeddedKernel,
@@ -28,8 +51,8 @@ fn side_of(side: &str) -> Result<orbital_core::protocols::ProtocolSide, String> 
 }
 
 impl KernelApi {
-    pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, String> {
-        let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
+    pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, ApiError> {
+        let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
         Ok(Self {
             embedded: EmbeddedKernel::new(schema, client_id)?,
             last_error: Mutex::new(String::new()),
@@ -309,33 +332,33 @@ pub struct ServerApi {
 }
 
 impl ServerApi {
-    pub fn new(resolved_schema_json: &str) -> Result<Self, String> {
-        let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema")?;
+    pub fn new(resolved_schema_json: &str) -> Result<Self, ApiError> {
+        let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
         Ok(Self {
             embedded: EmbeddedServer::new(schema)?,
             last_error: Mutex::new(String::new()),
         })
     }
 
-    fn record<T>(&self, result: Result<T, String>) -> Result<T, String> {
+    fn record<T, E: std::fmt::Display>(&self, result: Result<T, E>) -> Result<T, E> {
         if let Err(e) = &result {
             if let Ok(mut slot) = self.last_error.lock() {
-                *slot = e.clone();
+                *slot = e.to_string();
             }
         }
         result
     }
 
     /// A server holding this one's registered program and none of its session (`EmbeddedServer::fork_session`).
-    pub fn fork(&self) -> Result<Self, String> {
+    pub fn fork(&self) -> Result<Self, EntryError> {
         Ok(Self {
             embedded: self.record(self.embedded.fork_session())?,
             last_error: Mutex::new(String::new()),
         })
     }
 
-    pub fn fork_program(&self, program_json: &str) -> Result<Self, String> {
-        let schema: OrbitalSchema = parse(program_json, "program_json")?;
+    pub fn fork_program(&self, program_json: &str) -> Result<Self, ApiError> {
+        let schema: OrbitalSchema = self.record(parse(program_json, "program_json")).map_err(ApiError::Marshal)?;
         Ok(Self {
             embedded: self.record(self.embedded.fork_program(schema))?,
             last_error: Mutex::new(String::new()),

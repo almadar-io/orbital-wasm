@@ -2,7 +2,8 @@
 //! rest (http, `os/`, secrets, credentials, clock, random, services). The wire is [`ServerApi`]'s: a flight that
 //! still waits on the host lists only the requests the host owns, and `resume` takes only those answers.
 
-use crate::api::ServerApi;
+use crate::api::{ApiError, ServerApi};
+use orbital_core::runtime::kernel::EntryError;
 use orbital_core::embed::wire::{IoAnswerWire, IoRequestWire};
 use orbital_core::runtime::entity_source::EntitySource;
 use orbital_core::runtime::resumable::{BlockingHost, IoRequest};
@@ -55,11 +56,14 @@ impl StoredServer {
         resolved_schema_json: &str,
         source: Arc<dyn EntitySource>,
         capabilities: StoreCapabilities,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, ApiError> {
         let api = ServerApi::new(resolved_schema_json)?;
         let schema: OrbitalSchema = serde_json::from_str(resolved_schema_json)
-            .map_err(|e| format!("parse resolved schema: {e}"))?;
-        let (query, write) = (json(&capabilities.query)?, json(&capabilities.write)?);
+            .map_err(|e| ApiError::Marshal(format!("parse resolved schema: {e}")))?;
+        let (query, write) = (
+            json(&capabilities.query).map_err(ApiError::Marshal)?,
+            json(&capabilities.write).map_err(ApiError::Marshal)?,
+        );
         for orbital in &schema.orbitals {
             let entities =
                 std::iter::once(&orbital.entity).chain(orbital.auxiliary_entities.iter().flatten());
@@ -70,7 +74,7 @@ impl StoredServer {
                 if let Some(collection) = &def.collection {
                     source.bind_collection(&def.name, collection);
                 }
-                api.set_capabilities(&def.name, &query, &write)?;
+                api.set_capabilities(&def.name, &query, &write).map_err(ApiError::Marshal)?;
             }
         }
         Ok(Self {
@@ -222,15 +226,15 @@ pub struct ServerHandle(ServerApi);
 
 impl ServerHandle {
     /// The server's fork ([`ServerApi::fork`]).
-    pub fn fork(&self) -> Result<Self, String> {
+    pub fn fork(&self) -> Result<Self, EntryError> {
         self.0.fork().map(Self)
     }
 
-    pub fn fork_program(&self, program_json: &str) -> Result<Self, String> {
+    pub fn fork_program(&self, program_json: &str) -> Result<Self, ApiError> {
         self.0.fork_program(program_json).map(Self)
     }
 
-    pub fn plain(resolved_schema_json: &str) -> Result<Self, String> {
+    pub fn plain(resolved_schema_json: &str) -> Result<Self, ApiError> {
         ServerApi::new(resolved_schema_json).map(Self)
     }
 
