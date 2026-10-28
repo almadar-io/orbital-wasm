@@ -471,6 +471,7 @@ fn credential_seed_plan_names_the_declared_credentials_the_store_lacks_from_the_
 fn greeting_schema() -> String {
     json!({
         "name": "site",
+        "typeContractVersion": 1,
         "orbitals": [{
             "name": "Home",
             "entity": { "name": "HomeView", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },

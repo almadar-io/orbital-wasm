@@ -563,10 +563,11 @@ pub fn os_glob_matches(glob: &str, path: &str) -> bool {
     api::os_glob_matches(glob, path)
 }
 
-/// The typed event request a `program/dispatch` call names, as JSON; a record that is no event request throws the reason.
+/// The typed event request a `program/dispatch` call names, as an object; a record that is no event request throws the reason.
 #[wasm_bindgen(js_name = parseEventRequest)]
-pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<String, JsError> {
-    api::parse_event_request(payload_json, options_json).map_err(js)
+pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<JsValue, JsError> {
+    let request = api::parse_event_request(payload_json, options_json).map_err(js)?;
+    js_sys::JSON::parse(&request).map_err(|_| JsError::new("parseEventRequest: the kernel wrote no JSON"))
 }
 
 /// Whether the Chrome match pattern `pattern` matches `url`.
