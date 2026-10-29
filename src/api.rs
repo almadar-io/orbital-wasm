@@ -451,6 +451,11 @@ impl ServerApi {
         self.record(self.embedded.os_resolve_args_json(op, args_json))
     }
 
+    /// The next step of a TLS operation the kernel parked on a deferred raw ask (`tls_complete_json`).
+    pub fn tls_complete(&self, key: &str, outcome_json: &str) -> Result<String, String> {
+        self.record(self.embedded.tls_complete_json(key, outcome_json))
+    }
+
     pub fn live_item_delivered(&self, item_json: &str, viewer_json: &str, client_id: Option<&str>) -> Result<bool, String> {
         self.record(self.embedded.live_item_delivered(item_json, viewer_json, client_id))
     }

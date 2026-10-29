@@ -217,25 +217,24 @@ fn a_stored_server_answers_its_own_row_asks_and_finishes_in_one_call() {
     assert_eq!(server.api().in_flight(), 0);
 }
 
-fn with_http(mut program: Value) -> Value {
-    program["egress"] = json!(["https://api.example.test"]);
+fn with_host_ask(mut program: Value) -> Value {
     let transition = &mut program["orbitals"][0]["traits"][0]["stateMachine"]["transitions"][0];
     transition["effects"].as_array_mut().unwrap().push(json!([
-        "http", "GET", "https://api.example.test", "/ping", {}, { "emit": { "success": "SAVED", "failure": "SAVE_FAILED" } }
+        "random-bytes", 8, { "emit": { "success": "SAVED", "failure": "SAVE_FAILED" } }
     ]));
     program
 }
 
 #[test]
 fn control_a_stored_server_leaves_the_hosts_asks_to_the_host() {
-    let (server, cache) = stored(&with_http(schema()));
+    let (server, cache) = stored(&with_host_ask(schema()));
     let waiting = progress(&server.start("Main", &save()).unwrap());
     assert_eq!(waiting["status"], "await", "{waiting:#}");
     let kinds: Vec<&str> = waiting["requests"].as_array().unwrap().iter().map(|r| r["request"]["kind"].as_str().unwrap()).collect();
-    assert_eq!(kinds, ["http"], "only the host's ask is listed");
+    assert_eq!(kinds, ["random"], "only the host's ask is listed");
     assert_eq!(cache.list("Note").unwrap().len(), 1, "the row was written before the host was asked");
     let id = waiting["requests"][0]["id"].clone();
-    let reply = json!([{ "id": id, "answer": { "kind": "http", "result": { "error": { "kind": "failed", "message": "down" } } } }]);
+    let reply = json!([{ "id": id, "answer": { "kind": "random", "result": { "error": "down" } } }]);
     let done = progress(&server.resume(waiting["flight"].as_u64().unwrap(), &reply.to_string()).unwrap());
     assert_eq!(done["status"], "done", "{done:#}");
     assert_eq!(server.api().in_flight(), 0);

@@ -6,8 +6,6 @@
 
 pub mod api;
 pub mod credentials;
-pub mod http;
-pub mod oauth;
 pub mod stored;
 
 use api::{KernelApi, ServerApi};
@@ -330,6 +328,13 @@ impl Server {
         self.api.os_resolve_args(op, args_json).map_err(js)
     }
 
+    /// Feed a deferred raw `os/` outcome into the TLS operation the kernel parked under `key`: `null` when `key` parks
+    /// none, `{ ask: { op, args } }` for the next raw ask the host must answer, or `{ done: Settled }`.
+    #[wasm_bindgen(js_name = tlsComplete)]
+    pub fn tls_complete(&self, key: &str, outcome_json: &str) -> Result<String, JsError> {
+        self.api.tls_complete(key, outcome_json).map_err(js)
+    }
+
     pub fn start(&self, orbital: &str, request_json: &str) -> Result<String, JsError> {
         self.api.start(orbital, request_json).map_err(js)
     }
@@ -579,18 +584,6 @@ pub fn install_language(bundle_json: &str) -> Result<(), JsError> {
     api::install_language(bundle_json).map_err(js)
 }
 
-/// The `http` effect's sans-I/O driver (`orbital_core::runtime::http_request`) over JSON strings; each
-/// returns what `http::*` returns, or throws a JS `Error` for a malformed argument.
-#[wasm_bindgen(js_name = httpDriverStart)]
-pub fn http_driver_start(call_json: &str, egress_json: &str) -> Result<String, JsError> {
-    http::http_driver_start(call_json, egress_json).map_err(js)
-}
-
-#[wasm_bindgen(js_name = httpDriverResume)]
-pub fn http_driver_resume(driver_json: &str, answer_json: &str) -> Result<String, JsError> {
-    http::http_driver_resume(driver_json, answer_json).map_err(js)
-}
-
 #[wasm_bindgen(js_name = osGlobMatches)]
 pub fn os_glob_matches(glob: &str, path: &str) -> bool {
     api::os_glob_matches(glob, path)
@@ -629,60 +622,7 @@ pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Re
 
 #[wasm_bindgen(js_name = isPublicAddress)]
 pub fn is_public_address(ip: &str) -> Result<bool, JsError> {
-    http::is_public_address(ip).map_err(js)
-}
-
-#[wasm_bindgen(js_name = frameStream)]
-pub fn frame_stream(framing: &str, key: Option<String>, chunk: &str, carry: &str) -> Result<String, JsError> {
-    http::frame_stream(framing, key.as_deref(), chunk, carry).map_err(js)
-}
-
-#[wasm_bindgen(js_name = frameStreamFinish)]
-pub fn frame_stream_finish(framing: &str, key: Option<String>, carry: &str) -> Result<String, JsError> {
-    http::frame_stream_finish(framing, key.as_deref(), carry).map_err(js)
-}
-
-/// The pure half of `oauth-authorize`: parse the client and options (`oauthAuthorizePlan`), then build the
-/// authorization URL from the metadata and two host-drawn random values (`oauthAuthorizeBuild`).
-#[wasm_bindgen(js_name = oauthAuthorizePlan)]
-pub fn oauth_authorize_plan(client_json: &str, options_json: &str) -> Result<String, JsError> {
-    oauth::oauth_authorize_plan(client_json, options_json).map_err(js)
-}
-
-#[wasm_bindgen(js_name = oauthAuthorizeBuild)]
-pub fn oauth_authorize_build(
-    plan_json: &str,
-    client_id: &str,
-    metadata_json: &str,
-    state_base64: &str,
-    verifier_base64: &str,
-) -> Result<String, JsError> {
-    oauth::oauth_authorize_build(plan_json, client_id, metadata_json, state_base64, verifier_base64).map_err(js)
-}
-
-#[wasm_bindgen(js_name = oauthAuthorizeMockBuild)]
-pub fn oauth_authorize_mock_build(plan_json: &str, state_base64: &str) -> Result<String, JsError> {
-    oauth::oauth_authorize_mock_build(plan_json, state_base64).map_err(js)
-}
-
-#[wasm_bindgen(js_name = oauthFailure)]
-pub fn oauth_failure(reason: &str) -> Result<String, JsError> {
-    oauth::oauth_failure(reason).map_err(js)
-}
-
-#[wasm_bindgen(js_name = httpDriverDrop)]
-pub fn http_driver_drop(driver_json: &str) -> Result<(), JsError> {
-    http::http_driver_drop(driver_json).map_err(js)
-}
-
-#[wasm_bindgen(js_name = streamEvents)]
-pub fn stream_events(driver_json: &str, chunk: &str, carry: &str) -> Result<String, JsError> {
-    http::stream_events(driver_json, chunk, carry).map_err(js)
-}
-
-#[wasm_bindgen(js_name = streamFinish)]
-pub fn stream_finish(driver_json: &str, carry: &str) -> Result<String, JsError> {
-    http::stream_finish(driver_json, carry).map_err(js)
+    ip.parse().map(orbital_core::runtime::http_wire::is_public_address).map_err(|e| js(format!("parse ip: {e}")))
 }
 
 /// Evaluate `expressionsJson` (`SExpr[]`) against `contextJson` (`EvalContextWire`) in one crossing:
