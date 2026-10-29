@@ -185,7 +185,19 @@ mod tests {
         assert_eq!(ask["request"]["method"], "POST");
         let driver = started["driver"].to_string();
         let done = step_of(&http_driver_resume(&driver, r#"{"kind":"beacon","result":{"ok":{"via":"queue"}}}"#).unwrap());
-        assert_eq!(done["step"]["result"]["ok"], serde_json::json!({"sent":true,"via":"queue","status":null,"key":"k"}));
+        assert_eq!(done["step"]["result"]["ok"], serde_json::json!({"sent":true,"via":"queue","key":"k"}));
+        assert!(done["step"]["result"]["ok"].as_object().unwrap().get("status").is_none());
+    }
+
+    #[test]
+    fn control_a_fetched_beacon_settles_with_the_status_the_host_saw() {
+        let call = r#"{"method":"POST","origin":"https://c.example.com/e?v=1","path":"","request":{"text":"hi"},"key":"k","delivery":"beacon"}"#;
+        let started = step_of(&http_driver_start(call, r#"["https://c.example.com"]"#).unwrap());
+        let driver = started["driver"].to_string();
+        let done = step_of(&http_driver_resume(&driver, r#"{"kind":"beacon","result":{"ok":{"via":"fetch","status":204}}}"#).unwrap());
+        let ok = &done["step"]["result"]["ok"];
+        assert_eq!(ok["status"].as_f64(), Some(204.0));
+        assert_eq!((&ok["sent"], &ok["via"], &ok["key"]), (&serde_json::json!(true), &serde_json::json!("fetch"), &serde_json::json!("k")));
     }
 
     #[test]
