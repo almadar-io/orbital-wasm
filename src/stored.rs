@@ -238,6 +238,14 @@ impl ServerHandle {
         ServerApi::new(resolved_schema_json).map(Self)
     }
 
+    /// [`Self::plain`] with the source the kernel loads lazy orbitals through (EXEC-LOAD-2).
+    pub fn plain_lazy(
+        resolved_schema_json: &str,
+        lazy: std::sync::Arc<dyn orbital_core::runtime::LazySource>,
+    ) -> Result<Self, ApiError> {
+        ServerApi::with_lazy_source(resolved_schema_json, Some(lazy)).map(Self)
+    }
+
     /// Everything of the server that is not a flight.
     pub fn api(&self) -> &ServerApi {
         &self.0

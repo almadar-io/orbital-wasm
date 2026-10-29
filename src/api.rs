@@ -3,7 +3,8 @@
 //! JS host calls. Marshalling only: every decision is `orbital_core::embed`'s.
 
 use orbital_core::effects::MountSeed;
-use orbital_core::embed::{parse_theme_mode, EmbeddedKernel, EmbeddedServer, FoldBase};
+use orbital_core::embed::wire::{FoldProgressWire, FoldedNextWire};
+use orbital_core::embed::{parse_theme_mode, EmbeddedKernel, EmbeddedServer, FoldBase, FoldProgress};
 use orbital_core::runtime::kernel::EntryError;
 use orbital_core::runtime::TraitSnapshot;
 use orbital_core::{EventResponse, OrbitalSchema, Value};
@@ -120,6 +121,58 @@ impl KernelApi {
         })())
     }
 
+    /// Open a flight for work the kernel did not wire (a dispatch the host ran on its own, a frame's browser leg).
+    pub fn open_flight(&self) -> u64 {
+        self.embedded.open_flight()
+    }
+
+    /// [`Self::apply_server_response`] in flight order (EXEC-CONC-8): a `FoldProgressWire` as JSON, the answer folded
+    /// now or queued behind an older flight.
+    pub fn fold_in_order(
+        &self,
+        flight: u64,
+        response_json: &str,
+        already_delivered_json: Option<&str>,
+        base_json: Option<&str>,
+    ) -> Result<String, String> {
+        self.record((|| {
+            let response: EventResponse = parse(response_json, "response_json")?;
+            let already: HashSet<(String, String)> = match already_delivered_json {
+                Some(s) if !s.is_empty() => parse::<Vec<(String, String)>>(s, "already_delivered_json")?.into_iter().collect(),
+                _ => HashSet::new(),
+            };
+            let base: Option<FoldBase> = match base_json {
+                Some(s) if !s.is_empty() => Some(parse(s, "base_json")?),
+                _ => None,
+            };
+            let progress = match self.embedded.fold_in_order(flight, response, already, base)? {
+                FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
+                FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
+            };
+            to_json(&progress)
+        })())
+    }
+
+    /// The oldest queued answer that can fold now, folded: a `FoldedNextWire` as JSON, or `None` when nothing waits.
+    pub fn next_fold(&self) -> Result<Option<String>, String> {
+        self.record(
+            self.embedded
+                .next_fold()
+                .map(|next| {
+                    to_json(&match next.outcome {
+                        Ok(fold) => FoldedNextWire::Applied { ticket: next.ticket, fold },
+                        Err(error) => FoldedNextWire::Failed { ticket: next.ticket, error },
+                    })
+                })
+                .transpose(),
+        )
+    }
+
+    /// The flight is done: its answers are folded, or the host gave up on them.
+    pub fn end_flight(&self, flight: u64) -> bool {
+        self.embedded.end_flight(flight)
+    }
+
     /// The leg as a host that holds the circuit state takes it: only the `[shared]` frame rows its traits read.
     pub fn stateful_leg(&self, leg_json: &str) -> Result<String, String> {
         self.record((|| {
@@ -171,6 +224,11 @@ impl KernelApi {
             };
             to_json(&self.embedded.dispatch_mount(&seeds, entity_id, payload)?)
         })())
+    }
+
+    /// The delta a painter at version `since` of this kernel's frames needs: empty when current, else a snapshot.
+    pub fn frames_since(&self, since: u64) -> Result<String, String> {
+        self.record(to_json(&self.embedded.frames_since(since)?))
     }
 
     pub fn restore(
@@ -333,9 +391,17 @@ pub struct ServerApi {
 
 impl ServerApi {
     pub fn new(resolved_schema_json: &str) -> Result<Self, ApiError> {
+        Self::with_lazy_source(resolved_schema_json, None)
+    }
+
+    /// [`Self::new`] with the source the kernel loads the program's lazy orbitals through (EXEC-LOAD-2).
+    pub fn with_lazy_source(
+        resolved_schema_json: &str,
+        lazy: Option<std::sync::Arc<dyn orbital_core::runtime::LazySource>>,
+    ) -> Result<Self, ApiError> {
         let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
         Ok(Self {
-            embedded: EmbeddedServer::new(schema)?,
+            embedded: EmbeddedServer::with_lazy_source(schema, lazy)?,
             last_error: Mutex::new(String::new()),
         })
     }

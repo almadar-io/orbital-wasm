@@ -200,7 +200,7 @@ fn one_crossing_evaluates_every_binding_of_a_render_against_one_context() {
             ["=", "@user.role", "admin"],
             "@state",
             "@locale",
-            ["+", "@now", 1],
+            ["time/add", "@now", 1, "ms"],
             ["str/upper", "@entity.name"],
             ["array/len", "@entity.tags"],
             ["<", "@entity.qty", "@config.limit"]
@@ -209,7 +209,7 @@ fn one_crossing_evaluates_every_binding_of_a_render_against_one_context() {
     let values: Vec<&Value> = out.iter().map(value_of).collect();
     assert_eq!(
         values,
-        vec![&json!(5), &json!(true), &json!("open"), &json!("ar"), &json!(1001), &json!("ADA"), &json!(2), &json!(true)]
+        vec![&json!(5), &json!(true), &json!("open"), &json!("ar"), &json!("1970-01-01T00:00:01.001Z"), &json!("ADA"), &json!(2), &json!(true)]
     );
 }
 
@@ -419,7 +419,7 @@ fn a_row_binding_term_folds_to_a_scalar_a_list_or_a_typed_refusal() {
     assert_eq!(fold("@user.id"), json!({ "kind": "value", "value": "u1" }));
     assert_eq!(fold("@payload.q"), json!({ "kind": "value", "value": 7 }));
     assert_eq!(fold("@config.k"), json!({ "kind": "value", "value": null }));
-    assert_eq!(fold("@now"), json!({ "kind": "value", "value": 5 }));
+    assert_eq!(fold("@now"), json!({ "kind": "value", "value": "1970-01-01T00:00:00.005Z" }));
     assert_eq!(fold("@user.teams"), json!({ "kind": "list", "values": ["x", "y"] }));
     assert_eq!(fold("@user.profile")["kind"], "inexpressible");
     assert_eq!(fold("@user.missing")["kind"], "unspecialised");
@@ -549,4 +549,41 @@ fn a_visible_tick_is_skipped_once_the_host_reports_its_trait_off_screen() {
 fn control_a_visible_tick_the_host_never_reported_fires() {
     let kernel = KernelApi::new(&visible_schema(), "c1").unwrap();
     assert_eq!(fired_names(&kernel, 0), ["P", "V"]);
+}
+
+fn ordered_kernel() -> KernelApi {
+    let schema = std::fs::read_to_string(embed_dir().join("resolved").join("basic-entity.json")).unwrap();
+    KernelApi::new(&schema, "golden-client").unwrap()
+}
+
+fn flight_of(kernel: &KernelApi, event: &str) -> u64 {
+    parsed(&kernel.dispatch("TaskCRUD", None, event, None).unwrap())["flight"].as_u64().expect("the dispatch owes a leg")
+}
+
+const ANSWER: &str = r#"{"success":true,"transitioned":true,"states":{"TaskCRUD":"listing"},"emittedEvents":[]}"#;
+
+#[test]
+fn an_answer_ahead_of_an_older_flight_is_queued_and_folded_by_next_fold_once_that_flight_ends() {
+    let kernel = ordered_kernel();
+    let first = flight_of(&kernel, "INIT");
+    let second = flight_of(&kernel, "INIT");
+    assert!(first < second);
+    let queued = parsed(&kernel.fold_in_order(second, ANSWER, None, None).unwrap());
+    assert_eq!(queued["status"], "queued");
+    assert!(kernel.next_fold().unwrap().is_none());
+    assert_eq!(parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"], "applied");
+    assert!(kernel.end_flight(first));
+    let next = parsed(&kernel.next_fold().unwrap().expect("the queued answer folds"));
+    assert_eq!(next["outcome"], "applied");
+    assert_eq!(next["ticket"], queued["ticket"]);
+    assert!(kernel.next_fold().unwrap().is_none());
+}
+
+#[test]
+fn control_answers_in_dispatch_order_fold_at_once_and_an_unknown_flight_is_an_error() {
+    let kernel = ordered_kernel();
+    let first = flight_of(&kernel, "INIT");
+    assert_eq!(parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"], "applied");
+    assert!(kernel.fold_in_order(first + 100, ANSWER, None, None).is_err());
+    assert!(!kernel.end_flight(first + 100));
 }

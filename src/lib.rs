@@ -65,6 +65,39 @@ impl Kernel {
             .map_err(js)
     }
 
+    #[wasm_bindgen(js_name = openFlight)]
+    pub fn open_flight(&self) -> f64 {
+        self.api.open_flight() as f64
+    }
+
+    #[wasm_bindgen(js_name = foldInOrder)]
+    pub fn fold_in_order(
+        &self,
+        flight: f64,
+        response_json: &str,
+        already_delivered_json: Option<String>,
+        base_json: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .fold_in_order(flight as u64, response_json, already_delivered_json.as_deref(), base_json.as_deref())
+            .map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = nextFold)]
+    pub fn next_fold(&self) -> Result<Option<String>, JsError> {
+        self.api.next_fold().map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = endFlight)]
+    pub fn end_flight(&self, flight: f64) -> bool {
+        self.api.end_flight(flight as u64)
+    }
+
+    #[wasm_bindgen(js_name = framesSince)]
+    pub fn frames_since(&self, since: f64) -> Result<String, JsError> {
+        self.api.frames_since(since as u64).map_err(js)
+    }
+
     #[wasm_bindgen(js_name = statefulLeg)]
     pub fn stateful_leg(&self, leg_json: &str) -> Result<String, JsError> {
         self.api.stateful_leg(leg_json).map_err(js)
@@ -733,6 +766,8 @@ pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, args_jso
 }
 
 pub use orbital_core::embed::memory::MemoryStoreApi;
+pub use orbital_core::runtime::{LazyProgram, LazySource};
+pub use orbital_core::OrbitalSchema;
 
 #[derive(Default)]
 #[wasm_bindgen]
