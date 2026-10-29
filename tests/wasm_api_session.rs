@@ -505,3 +505,48 @@ fn control_a_malformed_catalog_is_refused_by_name() {
     let err = kernel.set_messages(r#"["en"]"#, r#"{"en":["not","a","map"]}"#).unwrap_err();
     assert!(err.contains("catalogs_json"), "{err}");
 }
+
+fn visible_schema() -> String {
+    let tick = |name: &str, visible: bool| {
+        json!({
+            "name": name, "linkedEntity": "E", "dispatch": "client",
+            "stateMachine": { "states": [{ "name": "on", "isInitial": true }], "transitions": [] },
+            "ticks": [{ "name": "beat", "interval": 0, "whileVisible": visible, "effects": [["set", "@entity.n", 1]] }]
+        })
+    };
+    json!({
+        "name": "App", "typeContractVersion": 1,
+        "orbitals": [{
+            "name": "Main",
+            "entity": { "name": "E", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }, { "name": "n", "type": "number" }] },
+            "traits": [tick("V", true), tick("P", false)]
+        }]
+    })
+    .to_string()
+}
+
+fn fired_names(kernel: &KernelApi, now_ms: u64) -> Vec<String> {
+    let mut names: Vec<String> = kernel
+        .frame(now_ms)
+        .unwrap()
+        .map(|wire| parsed(&wire)["fired"].as_array().unwrap().iter().map(|t| t["trait"].as_str().unwrap().to_string()).collect())
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_visible_tick_is_skipped_once_the_host_reports_its_trait_off_screen() {
+    let kernel = KernelApi::new(&visible_schema(), "c1").unwrap();
+    kernel.set_trait_on_screen("V", false);
+    kernel.set_trait_on_screen("P", false);
+    assert_eq!(fired_names(&kernel, 0), ["P"], "EXEC-TICK-4: only the plain tick fires off screen");
+    kernel.set_trait_on_screen("V", true);
+    assert_eq!(fired_names(&kernel, 1), ["P", "V"], "back on screen it resumes");
+}
+
+#[test]
+fn control_a_visible_tick_the_host_never_reported_fires() {
+    let kernel = KernelApi::new(&visible_schema(), "c1").unwrap();
+    assert_eq!(fired_names(&kernel, 0), ["P", "V"]);
+}
