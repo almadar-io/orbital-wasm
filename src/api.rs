@@ -586,6 +586,33 @@ impl ServerApi {
         )
     }
 
+    /// One tick pass at monotonic `now_ms`: the `(trait, tick)` pairs due now that this server runs, as
+    /// `[{ "trait", "tick" }]` JSON (`EmbeddedServer::tick_pass`).
+    pub fn tick_pass(&self, now_ms: u64) -> Result<String, String> {
+        let due: Vec<serde_json::Value> = self
+            .embedded
+            .tick_pass(now_ms)
+            .into_iter()
+            .map(|(trait_name, tick)| serde_json::json!({ "trait": trait_name, "tick": tick }))
+            .collect();
+        self.record(to_json(&due))
+    }
+
+    /// Stop the tick clock; its phase is kept.
+    pub fn tick_pause(&self) {
+        self.embedded.tick_pause();
+    }
+
+    /// Restart the tick clock; the paused span is never counted.
+    pub fn tick_resume(&self) {
+        self.embedded.tick_resume();
+    }
+
+    /// Whether the tick clock is stopped.
+    pub fn tick_paused(&self) -> bool {
+        self.embedded.tick_paused()
+    }
+
     pub fn last_error(&self) -> String {
         self.last_error
             .lock()
@@ -707,15 +734,6 @@ pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, St
 /// as JSON, with a trace per effect, the events raised, the writes made and the row after them.
 pub fn trace_effects(context_json: &str, effects_json: &str) -> Result<String, String> {
     orbital_core::embed::eval_wire::trace_effects_json(context_json, effects_json)
-}
-
-// ---- credentialSeedPlan ----------------------------------------------------------------------------------
-
-/// The credentials a `store`-source boot copies from the env into the store (`[{ service, envVar }]` as JSON): the
-/// declared ones the store does not hold and the env sets, each once. Only names cross; the host reads each value from its own env.
-#[cfg(feature = "full")]
-pub fn credential_seed_plan(declared_json: &str, held_json: &str, present_json: &str) -> Result<String, String> {
-    orbital_core::credential_admin::seed_plan_json(declared_json, held_json, present_json)
 }
 
 pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, args_json: &str, outcome_json: &str) -> Result<String, String> {

@@ -3,7 +3,7 @@
 
 use orbital_wasm::api::{
     check_mutation_access, evaluate_guards, evaluate_many, evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows,
-    trace_effects, credential_seed_plan, KernelApi,
+    trace_effects, KernelApi,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -42,7 +42,6 @@ fn step(kernel: &KernelApi, step: &Value) -> Value {
             None,
         )),
         "restore" => reported(kernel.restore(s("trait"), entity, &text("snapshot"))),
-        "abandon" => Value::Null,
         "tick" => reported(kernel.tick(s("trait"), s("tick"), entity)),
         "frame" => match kernel.frame(step["nowMs"].as_u64().unwrap()) {
             Ok(None) => Value::Null,
@@ -460,15 +459,6 @@ fn trace_effects_runs_a_list_against_a_row_through_the_wasm_api() {
     assert_eq!(out["emitted"][0]["payload"]["n"].as_f64(), Some(5.0));
     assert_eq!(out["effects"][0]["status"], "executed");
     assert!(trace_effects("{}", "not json").unwrap_err().contains("parse effects"), "a malformed list is an error");
-}
-
-#[test]
-fn credential_seed_plan_names_the_declared_credentials_the_store_lacks_from_the_names_the_env_sets() {
-    let declared = r#"[{"service":"stripe","envVar":"STRIPE_KEY"},{"service":"stripe","envVar":"STRIPE_WEBHOOK"}]"#;
-    let present = r#"["STRIPE_KEY","STRIPE_WEBHOOK"]"#;
-    let plan = credential_seed_plan(declared, r#"["STRIPE_WEBHOOK"]"#, present).unwrap();
-    assert_eq!(plan, r#"[{"service":"stripe","envVar":"STRIPE_KEY"}]"#);
-    assert_eq!(credential_seed_plan(declared, "[]", "[]").unwrap(), "[]", "control: nothing set, nothing to seed");
 }
 
 fn greeting_schema() -> String {

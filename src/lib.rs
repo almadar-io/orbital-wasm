@@ -454,6 +454,26 @@ impl Server {
         self.api.set_tick_mount(traits_json).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = tickPass)]
+    pub fn tick_pass(&self, now_ms: f64) -> Result<String, JsError> {
+        self.api.tick_pass(now_ms.max(0.0) as u64).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = tickPause)]
+    pub fn tick_pause(&self) {
+        self.api.tick_pause();
+    }
+
+    #[wasm_bindgen(js_name = tickResume)]
+    pub fn tick_resume(&self) {
+        self.api.tick_resume();
+    }
+
+    #[wasm_bindgen(js_name = tickPaused)]
+    pub fn tick_paused(&self) -> bool {
+        self.api.tick_paused()
+    }
+
     #[wasm_bindgen(js_name = lastError)]
     pub fn last_error(&self) -> String {
         self.api.last_error()
@@ -655,13 +675,6 @@ pub fn evaluate_traced(context_json: &str, expression_json: &str) -> Result<Stri
 #[wasm_bindgen(js_name = traceEffects)]
 pub fn trace_effects(context_json: &str, effects_json: &str) -> Result<String, JsError> {
     api::trace_effects(context_json, effects_json).map_err(js)
-}
-
-/// The credentials a `store`-source boot seeds from the env (`[{ service, envVar }]` as JSON): what the store lacks and the env holds.
-#[cfg(feature = "full")]
-#[wasm_bindgen(js_name = credentialSeedPlan)]
-pub fn credential_seed_plan(declared_json: &str, held_json: &str, present_json: &str) -> Result<String, JsError> {
-    api::credential_seed_plan(declared_json, held_json, present_json).map_err(js)
 }
 
 /// A listen route's `with` mapping applied to the source payload (the mapped payload as JSON).
