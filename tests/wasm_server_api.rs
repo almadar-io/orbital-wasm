@@ -153,12 +153,26 @@ fn a_malformed_language_bundle_is_refused_with_its_code() {
 }
 
 #[test]
-fn the_tick_mount_is_set_by_json_and_a_bad_list_is_refused() {
+fn the_mount_ledger_is_driven_by_json_and_a_bad_list_is_refused() {
     let api = ServerApi::new(&schema().to_string()).unwrap();
-    api.set_tick_mount(r#"["Draft"]"#).unwrap();
-    api.set_tick_mount("[]").unwrap();
-    let err = api.set_tick_mount("not json").unwrap_err();
+    api.mount_client("tab-1", "Main", r#"["Draft"]"#).unwrap();
+    api.unmount_client("tab-1", "Main", r#"["Draft"]"#).unwrap();
+    api.release_client("tab-1");
+    let err = api.mount_client("tab-1", "Main", "not json").unwrap_err();
     assert_eq!(api.last_error(), err);
+}
+
+#[test]
+fn the_tick_relay_opens_a_window_once_and_flushes_the_newest() {
+    let api = ServerApi::new(&schema().to_string()).unwrap();
+    let stamped = |x: u32| json!({ "event": "MOVED", "payload": x, "clientId": "tab-1", "tick": "beat", "sourceTrait": "Draft" }).to_string();
+    assert_eq!(api.relay_tick("Main", &stamped(1)).unwrap(), "50");
+    assert_eq!(api.relay_tick("Main", &stamped(2)).unwrap(), "null");
+    let items: Value = serde_json::from_str(&api.flush_tick_relay().unwrap()).unwrap();
+    assert_eq!(items.as_array().unwrap().len(), 1);
+    assert_eq!(items[0]["payload"].as_f64(), Some(2.0));
+    assert_eq!(items[0]["originClientId"], json!("tab-1"));
+    assert!(api.relay_tick("Main", "not json").is_err());
 }
 
 #[test]

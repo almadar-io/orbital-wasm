@@ -8,5 +8,7 @@ Every open gap this repo owns lives here. This file is the source of truth; the 
 - **Close by deleting.** Remove the entry in the same commit as the fix.
 
 
-Next code: `G-ORBITAL-WASM-006`
+Next code: `G-ORBITAL-WASM-008`
+
+- **G-ORBITAL-WASM-006** [mechanical] — The full wasm build still enables `wire-drivers` (Postgres and Redis over raw sockets, Cargo.toml:5-9), retired with the std drivers (R2 shell survey 2026-10-29); credentials.rs (575) still carries OAuth/ticket plumbing (:197-219, lib.rs:560-591) the kernel no longer asks for. Remove. Root cause: T2.
 

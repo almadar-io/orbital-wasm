@@ -1,0 +1,80 @@
+{
+  "name": "notes",
+  "orbitals": [
+    {
+      "name": "Main",
+      "entity": {
+        "name": "Note",
+        "persistence": "persistent",
+        "collection": "notes",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "title",
+            "type": "string"
+          }
+        ]
+      },
+      "traits": [
+        {
+          "name": "Draft",
+          "linkedEntity": "Note",
+          "stateMachine": {
+            "states": [
+              {
+                "name": "editing",
+                "isInitial": true
+              },
+              {
+                "name": "saving"
+              },
+              {
+                "name": "saved"
+              },
+              {
+                "name": "failed"
+              }
+            ],
+            "transitions": [
+              {
+                "from": "editing",
+                "to": "saving",
+                "event": "SAVE",
+                "effects": [
+                  [
+                    "persist",
+                    "create",
+                    "Note",
+                    {
+                      "id": "d1",
+                      "title": "draft"
+                    },
+                    {
+                      "emit": {
+                        "success": "SAVED",
+                        "failure": "SAVE_FAILED"
+                      }
+                    }
+                  ]
+                ]
+              },
+              {
+                "from": "saving",
+                "to": "saved",
+                "event": "SAVED"
+              },
+              {
+                "from": "saving",
+                "to": "failed",
+                "event": "SAVE_FAILED"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

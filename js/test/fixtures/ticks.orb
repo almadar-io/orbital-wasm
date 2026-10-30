@@ -1,0 +1,66 @@
+{
+  "name": "ticks",
+  "locales": [
+    "en",
+    "ar"
+  ],
+  "orbitals": [
+    {
+      "name": "Board",
+      "entity": {
+        "name": "Cell",
+        "persistence": "runtime",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          }
+        ]
+      },
+      "traits": [
+        {
+          "name": "Scoped",
+          "linkedEntity": "Cell",
+          "stateMachine": {
+            "states": [
+              {
+                "name": "idle",
+                "isInitial": true
+              }
+            ],
+            "transitions": []
+          },
+          "ticks": [
+            {
+              "name": "beat",
+              "interval": 10,
+              "effects": [
+                [
+                  "emit",
+                  "PULSE",
+                  {}
+                ],
+                [
+                  "render-ui",
+                  "main",
+                  {
+                    "type": "typography",
+                    "content": [
+                      "i18n/t",
+                      "k"
+                    ]
+                  }
+                ]
+              ]
+            }
+          ],
+          "emits": [
+            {
+              "event": "PULSE"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

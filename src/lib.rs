@@ -81,6 +81,16 @@ impl Kernel {
             .map_err(js)
     }
 
+    #[wasm_bindgen(js_name = deliverEmitToListeners)]
+    pub fn deliver_emit_to_listeners(&self, flight: f64, emitted_json: &str) -> Result<String, JsError> {
+        self.api.deliver_emit_to_listeners(flight as u64, emitted_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = deliverOriginEmit)]
+    pub fn deliver_origin_emit(&self, flight: f64, emitted_json: &str) -> Result<String, JsError> {
+        self.api.deliver_origin_emit(flight as u64, emitted_json).map_err(js)
+    }
+
     #[wasm_bindgen(js_name = nextFold)]
     pub fn next_fold(&self) -> Result<Option<String>, JsError> {
         self.api.next_fold().map_err(js)
@@ -233,8 +243,16 @@ impl Kernel {
         self.api.seed(entity_type, rows_json).map_err(js)
     }
 
-    pub fn remount(&self, traits_json: &str) -> Result<(), JsError> {
+    pub fn remount(&self, traits_json: &str) -> Result<String, JsError> {
         self.api.remount(traits_json).map_err(js)
+    }
+
+    pub fn enter(&self, route_path: Option<String>, mount_key: &str, traits_json: &str) -> Result<String, JsError> {
+        self.api.enter(route_path.as_deref(), mount_key, traits_json).map_err(js)
+    }
+
+    pub fn leave(&self) -> Result<String, JsError> {
+        self.api.leave().map_err(js)
     }
 
     #[wasm_bindgen(js_name = setMessages)]
@@ -256,7 +274,7 @@ impl Kernel {
         self.api.route_mounts(route_path).map_err(js)
     }
 
-    pub fn unmount(&self, traits_json: &str) -> Result<(), JsError> {
+    pub fn unmount(&self, traits_json: &str) -> Result<String, JsError> {
         self.api.unmount(traits_json).map_err(js)
     }
 
@@ -412,6 +430,12 @@ impl Server {
         self.api.route_mounts(route_path).map_err(js)
     }
 
+    /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
+    #[wasm_bindgen(js_name = contractQuery)]
+    pub fn contract_query(&self, query_json: &str) -> Result<String, JsError> {
+        self.api.contract_query(query_json).map_err(js)
+    }
+
     #[wasm_bindgen(js_name = setManagedProgram)]
     pub fn set_managed_program(&self, program_json: &str) -> Result<(), JsError> {
         self.api.set_managed_program(program_json).map_err(js)
@@ -449,14 +473,49 @@ impl Server {
             .map_err(js)
     }
 
-    #[wasm_bindgen(js_name = setTickMount)]
-    pub fn set_tick_mount(&self, traits_json: &str) -> Result<(), JsError> {
-        self.api.set_tick_mount(traits_json).map_err(js)
+    #[wasm_bindgen(js_name = mountClient)]
+    pub fn mount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), JsError> {
+        self.api.mount_client(client, orbital, traits_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = unmountClient)]
+    pub fn unmount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), JsError> {
+        self.api.unmount_client(client, orbital, traits_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = releaseClient)]
+    pub fn release_client(&self, client: &str) {
+        self.api.release_client(client);
+    }
+
+    #[wasm_bindgen(js_name = relayTick)]
+    pub fn relay_tick(&self, orbital: &str, request_json: &str) -> Result<String, JsError> {
+        self.api.relay_tick(orbital, request_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = setTickRelayInterval)]
+    pub fn set_tick_relay_interval(&self, interval_ms: f64) {
+        self.api.set_tick_relay_interval(interval_ms.max(0.0) as u64);
+    }
+
+    #[wasm_bindgen(js_name = flushTickRelay)]
+    pub fn flush_tick_relay(&self) -> Result<String, JsError> {
+        self.api.flush_tick_relay().map_err(js)
     }
 
     #[wasm_bindgen(js_name = tickPass)]
     pub fn tick_pass(&self, now_ms: f64) -> Result<String, JsError> {
         self.api.tick_pass(now_ms.max(0.0) as u64).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = setStateful)]
+    pub fn set_stateful(&self, stateful: bool) {
+        self.api.set_stateful(stateful);
+    }
+
+    #[wasm_bindgen(js_name = declaresTicks)]
+    pub fn declares_ticks(&self) -> bool {
+        self.api.declares_ticks()
     }
 
     #[wasm_bindgen(js_name = tickPause)]
@@ -563,34 +622,6 @@ impl CredentialVault {
         self.api.rotate().map_err(js)
     }
 
-    pub fn hold(
-        &self,
-        name: &str,
-        value: &str,
-        expires_at: f64,
-        now: f64,
-        principal: Option<String>,
-    ) -> Result<(), JsError> {
-        self.api
-            .hold(name, value, expires_at, now, principal.as_deref())
-            .map_err(js)
-    }
-
-    #[wasm_bindgen(js_name = takeBegin)]
-    pub fn take_begin(&self, name: &str, principal: Option<String>) -> Result<Option<String>, JsError> {
-        self.api.take_begin(name, principal.as_deref()).map_err(js)
-    }
-
-    #[wasm_bindgen(js_name = takeFinish)]
-    pub fn take_finish(&self, ticket: f64, now: f64) -> Result<Option<String>, JsError> {
-        self.api.take_finish(ticket, now).map_err(js)
-    }
-
-    #[wasm_bindgen(js_name = takeCancel)]
-    pub fn take_cancel(&self, ticket: f64) -> Result<(), JsError> {
-        self.api.take_cancel(ticket).map_err(js)
-    }
-
     #[wasm_bindgen(js_name = takeWrites)]
     pub fn take_writes(&self) -> Result<String, JsError> {
         self.api.take_writes().map_err(js)
@@ -614,6 +645,12 @@ pub fn os_glob_matches(glob: &str, path: &str) -> bool {
 pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<JsValue, JsError> {
     let request = api::parse_event_request(payload_json, options_json).map_err(js)?;
     js_sys::JSON::parse(&request).map_err(|_| JsError::new("parseEventRequest: the kernel wrote no JSON"))
+}
+
+/// The program's emitter-to-listener wire table (`EventWire[]` as JSON), by the source rule the kernel delivers by.
+#[wasm_bindgen(js_name = eventWires)]
+pub fn event_wires(schema_json: &str) -> Result<String, JsError> {
+    api::event_wires(schema_json).map_err(js)
 }
 
 /// Whether the Chrome match pattern `pattern` matches `url`.

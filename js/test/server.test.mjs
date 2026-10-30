@@ -3,31 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pkgDir, loadPkg } from './pkg.mjs';
+import { pkgDir, loadPkg, languageBundle } from './pkg.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { Server, initSync } = await loadPkg();
+const { Server, initSync, installLanguage } = await loadPkg();
 initSync({ module: readFileSync(join(pkgDir, 'orbital_wasm_bg.wasm')) });
+installLanguage(languageBundle());
 
-const emit = { emit: { success: 'SAVED', failure: 'SAVE_FAILED' } };
-const schema = JSON.stringify({
-  name: 'notes',
-  orbitals: [{
-    name: 'Main',
-    entity: { name: 'Note', persistence: 'persistent', collection: 'notes', fields: [{ name: 'id', type: 'string' }, { name: 'title', type: 'string' }] },
-    traits: [{
-      name: 'Draft', linkedEntity: 'Note',
-      stateMachine: {
-        states: [{ name: 'editing', isInitial: true }, { name: 'saving' }, { name: 'saved' }, { name: 'failed' }],
-        transitions: [
-          { from: 'editing', to: 'saving', event: 'SAVE', effects: [['persist', 'create', 'Note', { id: 'd1', title: 'draft' }, emit]] },
-          { from: 'saving', to: 'saved', event: 'SAVED' },
-          { from: 'saving', to: 'failed', event: 'SAVE_FAILED' },
-        ],
-      },
-    }],
-  }],
-});
+const fixture = (name) => readFileSync(join(here, 'fixtures', `${name}.resolved.json`), 'utf8');
+const schema = fixture('notes');
 
 const answerOf = (request, rows, refuse) => {
   switch (request.kind) {
@@ -98,43 +82,58 @@ test('errors throw and are the last error; flights are validated', () => {
   assert.equal(server.abandon(started.flight), false);
 });
 
-const tickSchema = JSON.stringify({
-  name: 'ticks',
-  locales: ['en', 'ar'],
-  orbitals: [{
-    name: 'Board',
-    entity: { name: 'Cell', persistence: 'runtime', fields: [{ name: 'id', type: 'string' }] },
-    traits: [{
-      name: 'Scoped', linkedEntity: 'Cell',
-      stateMachine: { states: [{ name: 'idle', isInitial: true }], transitions: [] },
-      ticks: [{ name: 'beat', interval: 10, effects: [['emit', 'PULSE', {}], ['render-ui', 'main', { type: 'typography', content: ['i18n/t', 'k'] }]] }],
-      emits: [{ event: 'PULSE' }],
-    }],
-  }],
-});
+const tickSchema = fixture('ticks');
 
 const tick = { event: '$TICK_beat', runTick: { trait: 'Scoped', tick: 'beat' }, targetTrait: 'Scoped', entityId: 'c1' };
 
-test('a tick fires only while its trait is in the tick mount, and the mount is set by JSON', async () => {
+test('a tick fires only while a client holds its trait, and the ledger is driven by JSON', async () => {
   const server = new Server(tickSchema);
   const rows = [];
   const paused = await drive(server, 'Board', tick, rows);
   assert.deepEqual(paused.emittedEvents, []);
-  server.setTickMount('["Scoped"]');
+  server.mountClient('tab-1', 'Board', '["Scoped"]');
   const fired = await drive(server, 'Board', tick, rows);
   assert.deepEqual(fired.emittedEvents.map((e) => e.event), ['PULSE']);
-  server.setTickMount('[]');
+  server.unmountClient('tab-1', 'Board', '["Scoped"]');
   assert.deepEqual((await drive(server, 'Board', tick, rows)).emittedEvents, []);
-  assert.throws(() => server.setTickMount('not json'), /traits_json/);
+  server.mountClient('tab-2', 'Board', '["Scoped"]');
+  server.releaseClient('tab-2');
+  assert.deepEqual((await drive(server, 'Board', tick, rows)).emittedEvents, []);
+  assert.throws(() => server.mountClient('tab-1', 'Board', 'not json'), /traits_json/);
+});
+
+test('a fired tick names its declaring orbital, and the coalesced relay keeps the newest per key', async () => {
+  const server = new Server(tickSchema);
+  server.mountClient('tab-1', 'Board', '["Scoped"]');
+  assert.deepEqual(JSON.parse(server.tickPass(0)), []);
+  assert.deepEqual(JSON.parse(server.tickPass(10)), [{ orbital: 'Board', trait: 'Scoped', tick: 'beat' }]);
+  const stamped = (x) => JSON.stringify({ event: 'MOVED', payload: { x }, clientId: 'tab-1', tick: 'beat', sourceTrait: 'Scoped' });
+  assert.equal(JSON.parse(server.relayTick('Board', stamped(1))), 50);
+  assert.equal(JSON.parse(server.relayTick('Board', stamped(2))), null);
+  const items = JSON.parse(server.flushTickRelay());
+  assert.equal(items.length, 1);
+  assert.deepEqual(items[0].payload, { x: 2 });
+  assert.equal(server.declaresTicks(), true);
+});
+
+test('a stateful server refuses carried circuit state outside a delegated leg, and an undeclared locale', async () => {
+  const server = new Server(tickSchema);
+  server.setStateful(true);
+  const carried = JSON.parse(server.start('Board', JSON.stringify({ event: 'GO', traits: [{ trait: 'Scoped', from: 'idle' }] })));
+  assert.equal(carried.response.success, false);
+  assert.equal(carried.response.rejections[0].code, 'client-circuit-state-refused');
+  server.setMessages('["en","ar"]', '{}');
+  const locale = JSON.parse(server.start('Board', JSON.stringify({ event: 'GO', targetTrait: 'Scoped', locale: 'fr' })));
+  assert.equal(locale.response.rejections[0].code, 'locale-not-declared');
 });
 
 test('the program messages are set by JSON and picked by the request locale', async () => {
   const server = new Server(tickSchema);
-  server.setTickMount('["Scoped"]');
+  server.mountClient('tab-1', 'Board', '["Scoped"]');
   server.setMessages('["en","ar"]', JSON.stringify({ en: { k: 'Hello' }, ar: { k: 'مرحبا' } }));
   const ar = await drive(server, 'Board', { ...tick, locale: 'ar' }, []);
-  assert.match(JSON.stringify(ar.clientEffects), /مرحبا/);
+  assert.match(JSON.stringify(ar.clientEffectsByTrait), /مرحبا/);
   const en = await drive(server, 'Board', { ...tick, locale: 'en' }, []);
-  assert.match(JSON.stringify(en.clientEffects), /Hello/);
+  assert.match(JSON.stringify(en.clientEffectsByTrait), /Hello/);
   assert.throws(() => server.setMessages('{', '{}'), /locales_json/);
 });

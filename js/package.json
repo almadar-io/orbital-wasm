@@ -39,6 +39,6 @@
   "scripts": {
     "build": "sh scripts/build.sh",
     "test": "node --test test/*.test.mjs",
-    "test:client": "KERNEL_PKG=pkg-client node --test test/kernel.test.mjs test/server.test.mjs test/http.test.mjs test/client.test.mjs"
+    "test:client": "KERNEL_PKG=pkg-client node --test test/kernel.test.mjs test/server.test.mjs test/client.test.mjs"
   }
 }

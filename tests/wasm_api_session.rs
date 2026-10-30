@@ -3,7 +3,7 @@
 
 use orbital_wasm::api::{
     check_mutation_access, evaluate_guards, evaluate_many, evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows,
-    trace_effects, KernelApi,
+    trace_effects, KernelApi, ServerApi,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -151,6 +151,20 @@ fn a_failed_call_is_the_error_and_the_last_error() {
         .unwrap_err();
     assert_eq!(kernel.last_error(), err);
     assert!(kernel.set_current_user("{not json").is_err());
+}
+
+#[test]
+fn the_declared_contract_is_asked_of_the_kernel_not_read_off_the_program() {
+    let schema = std::fs::read_to_string(embed_dir().join("resolved/basic-entity.json")).unwrap();
+    let server = ServerApi::new(&schema).unwrap();
+    {
+        let ask = |q: &str| server.contract_query(q);
+        assert_eq!(pj(&ask(r#"{"kind":"externalInputs"}"#).unwrap()), json!([]));
+        let owner = pj(&ask(r#"{"kind":"entityOwner","entity":"NoSuchEntity"}"#).unwrap());
+        assert!(owner.is_null(), "control: an entity no orbital declares has no owner");
+        assert!(ask(r#"{"kind":"noSuchQuery"}"#).is_err(), "control: an unknown query is a typed refusal");
+        assert!(ask("{not json").is_err());
+    }
 }
 
 fn norm(value: Value) -> Value {
@@ -576,4 +590,93 @@ fn control_answers_in_dispatch_order_fold_at_once_and_an_unknown_flight_is_an_er
     assert_eq!(parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"], "applied");
     assert!(kernel.fold_in_order(first + 100, ANSWER, None, None).is_err());
     assert!(!kernel.end_flight(first + 100));
+}
+
+fn paged_schema() -> String {
+    json!({
+        "name": "App", "typeContractVersion": 1,
+        "orbitals": [{
+            "name": "Main",
+            "entity": { "name": "E", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [
+                { "name": "A", "linkedEntity": "E", "dispatch": "client", "emits": [{ "event": "PING" }],
+                  "stateMachine": { "states": [{ "name": "on", "isInitial": true }],
+                      "transitions": [{ "from": "on", "to": "on", "event": "INIT", "effects": [] }] } },
+                { "name": "B", "linkedEntity": "E", "dispatch": "client",
+                  "listens": [{ "event": "PING", "triggers": "SHOW", "source": { "kind": "trait", "trait": "A" } }],
+                  "stateMachine": { "states": [{ "name": "idle", "isInitial": true }, { "name": "shown" }],
+                      "transitions": [{ "from": "idle", "to": "shown", "event": "SHOW", "effects": [] }] } }
+            ],
+            "pages": [{ "name": "Home", "path": "/", "traits": [{ "ref": "A" }, { "ref": "B" }] }]
+        }]
+    })
+    .to_string()
+}
+
+#[test]
+fn enter_and_leave_answer_the_seeds_and_the_unmount_legs_as_json() {
+    let kernel = KernelApi::new(&paged_schema(), "tab").unwrap();
+    let entered = parsed(&kernel.enter(Some("/"), "page", r#"["A","B"]"#).unwrap());
+    assert_eq!(entered["seeds"], json!([{ "trait": "A", "event": "INIT" }]));
+    assert_eq!(entered["left"], json!([]));
+    let left = parsed(&kernel.leave().unwrap());
+    assert_eq!(left.as_array().unwrap().len(), 2);
+    assert_eq!(left[0]["leg"]["event"], json!("$UNMOUNT"));
+    assert_eq!(left[0]["leg"]["clientId"], json!("tab"));
+    assert!(kernel.enter(Some("/"), "page", r#"["Nope"]"#).is_err());
+}
+
+#[test]
+fn deliver_emit_to_listeners_runs_the_declared_listener_and_not_the_emitter() {
+    let kernel = KernelApi::new(&paged_schema(), "tab").unwrap();
+    let flight = kernel.open_flight();
+    let emitted = json!({ "event": "PING", "source": { "orbital": "Main", "trait": "A", "dispatched": true } }).to_string();
+    let progress = parsed(&kernel.deliver_emit_to_listeners(flight, &emitted).unwrap());
+    assert_eq!(progress["status"], json!("applied"));
+    assert_eq!(kernel.get_state("B", None), "shown");
+}
+
+#[test]
+fn event_wires_lists_the_deliveries_between_traits() {
+    let wires = parsed(&orbital_wasm::api::event_wires(&paged_schema()).unwrap());
+    assert_eq!(
+        wires,
+        json!([{ "emitterOrbital": "Main", "emitterTrait": "A", "listenerOrbital": "Main", "listenerTrait": "B", "event": "PING" }])
+    );
+}
+
+fn self_listening_schema() -> String {
+    json!({
+        "name": "App", "typeContractVersion": 1,
+        "orbitals": [{
+            "name": "Main",
+            "entity": { "name": "E", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [
+                { "name": "Caller", "linkedEntity": "E", "dispatch": "client", "emits": [{ "event": "PROGRESS" }],
+                  "listens": [{ "event": "PROGRESS", "triggers": "PROGRESS", "source": { "kind": "trait", "trait": "Caller" } }],
+                  "stateMachine": { "states": [{ "name": "idle", "isInitial": true }, { "name": "once" }, { "name": "twice" }],
+                      "transitions": [
+                          { "from": "idle", "to": "once", "event": "PROGRESS", "effects": [] },
+                          { "from": "once", "to": "twice", "event": "PROGRESS", "effects": [] }] } }
+            ],
+            "pages": [{ "name": "Home", "path": "/", "traits": [{ "ref": "Caller" }] }]
+        }]
+    })
+    .to_string()
+}
+
+#[test]
+fn deliver_origin_emit_does_not_run_the_self_listening_emitter_twice() {
+    let emitted = json!({ "event": "PROGRESS", "source": { "orbital": "Main", "trait": "Caller" } }).to_string();
+    let origin = KernelApi::new(&self_listening_schema(), "tab").unwrap();
+    origin.dispatch("Caller", None, "PROGRESS", Some("{}")).unwrap();
+    let flight = origin.open_flight();
+    assert_eq!(parsed(&origin.deliver_origin_emit(flight, &emitted).unwrap())["status"], json!("applied"));
+    assert_eq!(origin.get_state("Caller", None), "once");
+
+    let peer = KernelApi::new(&self_listening_schema(), "tab").unwrap();
+    peer.dispatch("Caller", None, "PROGRESS", Some("{}")).unwrap();
+    let flight = peer.open_flight();
+    peer.deliver_emit_to_listeners(flight, &emitted).unwrap();
+    assert_eq!(peer.get_state("Caller", None), "twice", "control: a peer delivery runs the self route again");
 }

@@ -10,7 +10,7 @@ description = "The embedded Almadar kernel for JavaScript hosts (npm @almadar/ke
 default = ["full"]
 # The full kernel: Node hosts and tools. The client build (`--no-default-features`) is what a browser loads.
 full = ["wire-drivers"]
-# Postgres and Redis over raw sockets; a browser cannot open them.
+# Redis over raw sockets; a browser cannot open them.
 wire-drivers = ["orbital-core/wire-drivers"]
 
 [lib]

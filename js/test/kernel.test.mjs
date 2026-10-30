@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pkgDir, loadPkg } from './pkg.mjs';
+import { pkgDir, loadPkg, languageBundle } from './pkg.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const embed = join(here, '../../../orbital-core/tests/fixtures/embed');
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 
-const { Kernel, initSync, evaluateGuards, evaluateMany, evaluateTraced, mapListenPayload, scopeRows, checkMutationAccess, resolveRowBinding } = await loadPkg();
+const { Kernel, initSync, installLanguage, evaluateGuards, evaluateMany, evaluateTraced, mapListenPayload, scopeRows, checkMutationAccess, resolveRowBinding } = await loadPkg();
 initSync({ module: readFileSync(join(pkgDir, 'orbital_wasm_bg.wasm')) });
+installLanguage(languageBundle());
 
 function run(script) {
   const schema = readFileSync(join(embed, 'resolved', `${script.schema}.json`), 'utf8');
@@ -119,17 +120,20 @@ test('an empty schema is refused at construction', () => {
   assert.throws(() => new Kernel('{"name":"Empty","orbitals":[]}', 'c'), /resolved schema declares no orbitals/);
 });
 
-test('evaluateMany binds a render in one crossing and a failing expression is its own outcome', () => {
+test('evaluateMany binds a render in one crossing; a failing expression is its own outcome (EXEC-EVAL-7)', () => {
   const context = JSON.stringify({ entity: { qty: 3 }, payload: { step: 2 }, user: { role: 'admin' }, state: 'open' });
   const out = JSON.parse(evaluateMany(context, JSON.stringify([['+', '@entity.qty', '@payload.step'], ['=', '@user.role', 'admin'], '@state', ['/', 1, 0], ['str/upper', '@payload.missing']])));
-  assert.deepEqual(out.slice(0, 3), [{ kind: 'value', value: 5 }, { kind: 'value', value: true }, { kind: 'value', value: 'open' }]);
-  assert.equal(out[3].kind, 'error');
-  assert.deepEqual(out[4], { kind: 'value', value: '' });
+  assert.deepEqual(out.slice(0, 4), [{ kind: 'value', value: 5 }, { kind: 'value', value: true }, { kind: 'value', value: 'open' }, { kind: 'value', value: null }]);
+  assert.equal(out[4].kind, 'error');
+  assert.match(out[4].message, /expected string, got null/);
 });
 
-test('evaluateGuards decides by the kernel truthiness: an empty list is false', () => {
-  const verdicts = JSON.parse(evaluateGuards(JSON.stringify({ entity: { tags: [], n: 2 } }), JSON.stringify(['@entity.tags', '@entity.n', ['>', '@entity.n', 5]])));
-  assert.deepEqual(verdicts.map((v) => v.value), [false, true, false]);
+test('evaluateGuards takes booleans only: a list or number is a type error, never read by truthiness (EXEC-EVAL-7)', () => {
+  const verdicts = JSON.parse(evaluateGuards(JSON.stringify({ entity: { tags: [], n: 2 } }), JSON.stringify(['@entity.tags', '@entity.n', ['>', '@entity.n', 5], ['>', '@entity.n', 1]])));
+  assert.deepEqual(verdicts.map((v) => v.kind), ['error', 'error', 'value', 'value']);
+  assert.match(verdicts[0].message, /expected boolean, got array/);
+  assert.match(verdicts[1].message, /expected boolean, got number/);
+  assert.deepEqual(verdicts.slice(2).map((v) => v.value), [false, true]);
 });
 
 test('evaluateTraced records the short-circuited argument as skipped', () => {

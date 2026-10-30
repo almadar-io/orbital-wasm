@@ -153,6 +153,32 @@ impl KernelApi {
         })())
     }
 
+    /// [`Self::fold_in_order`] for an emit that entered from outside the kernel: delivered to its declared listeners
+    /// only (guards and payload mapping included), a `FoldProgressWire` as JSON.
+    pub fn deliver_emit_to_listeners(&self, flight: u64, emitted_json: &str) -> Result<String, String> {
+        self.record((|| {
+            let emitted: orbital_core::EmittedEvent = parse(emitted_json, "emitted_json")?;
+            let progress = match self.embedded.deliver_emit_to_listeners(flight, emitted)? {
+                FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
+                FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
+            };
+            to_json(&progress)
+        })())
+    }
+
+    /// [`Self::deliver_emit_to_listeners`] for a live message of this client's own running call, whose emitter ran its own
+    /// arm as that call's progress dispatch: the emitter is not delivered its own emit a second time.
+    pub fn deliver_origin_emit(&self, flight: u64, emitted_json: &str) -> Result<String, String> {
+        self.record((|| {
+            let emitted: orbital_core::EmittedEvent = parse(emitted_json, "emitted_json")?;
+            let progress = match self.embedded.deliver_origin_emit(flight, emitted)? {
+                FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
+                FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
+            };
+            to_json(&progress)
+        })())
+    }
+
     /// The oldest queued answer that can fold now, folded: a `FoldedNextWire` as JSON, or `None` when nothing waits.
     pub fn next_fold(&self) -> Result<Option<String>, String> {
         self.record(
@@ -335,10 +361,29 @@ impl KernelApi {
         )
     }
 
-    pub fn remount(&self, traits_json: &str) -> Result<(), String> {
+    /// Declare a new mount: the traits the page had entered that it no longer holds, with the legs that release them
+    /// (`Left[]` as JSON).
+    pub fn remount(&self, traits_json: &str) -> Result<String, String> {
         self.record(
-            parse::<Vec<String>>(traits_json, "traits_json").map(|t| self.embedded.remount(t)),
+            parse::<Vec<String>>(traits_json, "traits_json")
+                .map(|t| self.embedded.remount(t))
+                .and_then(|left| to_json(&left)),
         )
+    }
+
+    /// The page `mount_key` holds `traits_json`, opened at `route_path` if it has one: the seeds to mount and the traits
+    /// that left, an `Entered` as JSON.
+    pub fn enter(&self, route_path: Option<&str>, mount_key: &str, traits_json: &str) -> Result<String, String> {
+        self.record(
+            parse::<Vec<String>>(traits_json, "traits_json")
+                .and_then(|t| self.embedded.enter(route_path, mount_key, t))
+                .and_then(|entered| to_json(&entered)),
+        )
+    }
+
+    /// Every trait the page entered leaves: the legs that release them (`Left[]` as JSON).
+    pub fn leave(&self) -> Result<String, String> {
+        self.record(to_json(&self.embedded.leave()))
     }
 
     /// The viewer's locales (`string[]`, the first is painted) and their catalogs (`{ [locale]: { [key]: text } }`), as JSON.
@@ -365,9 +410,12 @@ impl KernelApi {
         self.record(to_json(&self.embedded.route_mounts(route_path)))
     }
 
-    pub fn unmount(&self, traits_json: &str) -> Result<(), String> {
+    /// The legs that release the traits of `traits_json` the page had entered (`Left[]` as JSON).
+    pub fn unmount(&self, traits_json: &str) -> Result<String, String> {
         self.record(
-            parse::<Vec<String>>(traits_json, "traits_json").map(|t| self.embedded.unmount(t)),
+            parse::<Vec<String>>(traits_json, "traits_json")
+                .map(|t| self.embedded.unmount(t))
+                .and_then(|left| to_json(&left)),
         )
     }
 
@@ -578,24 +626,69 @@ impl ServerApi {
         self.record(to_json(&self.embedded.route_mounts(route_path)))
     }
 
-    /// The traits whose mount-scoped ticks fire (`string[]` as JSON): the union of what the host's clients mounted.
-    pub fn set_tick_mount(&self, traits_json: &str) -> Result<(), String> {
+    /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
+    pub fn contract_query(&self, query_json: &str) -> Result<String, String> {
         self.record(
-            parse::<Vec<String>>(traits_json, "traits_json")
-                .map(|t| self.embedded.set_tick_mount(t)),
+            parse::<orbital_core::runtime::kernel::contract_query::ContractQuery>(query_json, "query_json")
+                .and_then(|query| self.embedded.contract_query(query))
+                .and_then(|answer| to_json(&answer)),
         )
     }
 
+    /// `client` mounted the traits of `traits_json` (`string[]`) of `orbital`: their mount-scoped ticks fire while any client holds them.
+    pub fn mount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), String> {
+        self.record(
+            parse::<Vec<String>>(traits_json, "traits_json")
+                .map(|t| self.embedded.mount_client(client, orbital, t)),
+        )
+    }
+
+    /// `client` unmounted the traits of `traits_json` (`string[]`) of `orbital`.
+    pub fn unmount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), String> {
+        self.record(
+            parse::<Vec<String>>(traits_json, "traits_json")
+                .map(|t| self.embedded.unmount_client(client, orbital, t)),
+        )
+    }
+
+    /// `client` is gone: everything it had mounted is released.
+    pub fn release_client(&self, client: &str) {
+        self.embedded.release_client(client);
+    }
+
+    /// Queue the tick-stamped `request_json` (an `EventRequest`) of `orbital` for the coalesced peer relay; the window's
+    /// length in ms when it opened one, else `null` (JSON).
+    pub fn relay_tick(&self, orbital: &str, request_json: &str) -> Result<String, String> {
+        self.record(
+            parse::<orbital_core::EventRequest>(request_json, "request_json")
+                .and_then(|request| to_json(&self.embedded.relay_tick(orbital, &request))),
+        )
+    }
+
+    /// The relay window's length in ms.
+    pub fn set_tick_relay_interval(&self, interval_ms: u64) {
+        self.embedded.set_tick_relay_interval(interval_ms);
+    }
+
+    /// Every queued relay item (`LiveBroadcastItem[]` as JSON); the window closes.
+    pub fn flush_tick_relay(&self) -> Result<String, String> {
+        self.record(to_json(&self.embedded.flush_tick_relay()))
+    }
+
     /// One tick pass at monotonic `now_ms`: the `(trait, tick)` pairs due now that this server runs, as
-    /// `[{ "trait", "tick" }]` JSON (`EmbeddedServer::tick_pass`).
+    /// `FiredTick` JSON (`EmbeddedServer::tick_pass`).
     pub fn tick_pass(&self, now_ms: u64) -> Result<String, String> {
-        let due: Vec<serde_json::Value> = self
-            .embedded
-            .tick_pass(now_ms)
-            .into_iter()
-            .map(|(trait_name, tick)| serde_json::json!({ "trait": trait_name, "tick": tick }))
-            .collect();
-        self.record(to_json(&due))
+        self.record(to_json(&self.embedded.tick_pass(now_ms)))
+    }
+
+    /// This host holds the circuit state: a client's copy is taken only on a delegated leg.
+    pub fn set_stateful(&self, stateful: bool) {
+        self.embedded.set_stateful(stateful);
+    }
+
+    /// Whether the program declares any tick.
+    pub fn declares_ticks(&self) -> bool {
+        self.embedded.declares_ticks()
     }
 
     /// Stop the tick clock; its phase is kept.
@@ -642,6 +735,11 @@ pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<Str
 }
 
 /// Whether the Chrome match pattern `pattern` matches `url`.
+pub fn event_wires(schema_json: &str) -> Result<String, String> {
+    let schema: OrbitalSchema = parse(schema_json, "schema_json")?;
+    to_json(&orbital_core::event_wires::event_wires(&schema))
+}
+
 pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
     orbital_core::embed::tab_url_matches(pattern, url)
 }

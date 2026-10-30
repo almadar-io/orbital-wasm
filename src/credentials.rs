@@ -180,46 +180,6 @@ impl VaultApi {
         out(&self.store.rotate()?)
     }
 
-    /// Keep `value` sealed as a one-use value of `name` (for `principal`) until `expires_at` (epoch ms); `now` sweeps expired ones.
-    pub fn hold(
-        &self,
-        name: &str,
-        value: &str,
-        expires_at: f64,
-        now: f64,
-        principal: Option<&str>,
-    ) -> Result<(), String> {
-        self.loaded()?;
-        self.store
-            .hold(name, value, expires_at as i64, now as i64, principal)
-    }
-
-    /// Find the one-use value held for `name` (for `principal`) without opening it: `{ ticket, write: "delete", id,
-    /// ifPresent: true }` for the host to run as a conditional delete, or none held. Only a host whose delete removed the
-    /// row calls `take_finish`; one that found it gone calls `take_cancel`.
-    pub fn take_begin(
-        &self,
-        name: &str,
-        principal: Option<&str>,
-    ) -> Result<Option<String>, String> {
-        self.loaded()?;
-        Ok(self.store.take_begin(name, principal)?.map(|held| {
-            json!({ "ticket": held.ticket, "write": "delete", "id": held.id, "ifPresent": true }).to_string()
-        }))
-    }
-
-    /// Open the value of the row the host's conditional delete removed; an expired one is consumed and not returned.
-    pub fn take_finish(&self, ticket: f64, now: f64) -> Result<Option<String>, String> {
-        self.loaded()?;
-        self.store.take_finish(ticket as u64, now as i64)
-    }
-
-    pub fn take_cancel(&self, ticket: f64) -> Result<(), String> {
-        self.loaded()?;
-        self.store.take_cancel(ticket as u64);
-        Ok(())
-    }
-
     /// The writes since the last call, in order, for the host to apply to its medium:
     /// `[{ write: "create", id, data } | { write: "update", id, data } | { write: "delete", id }]`. A created row carries
     /// the id in `data`; an update merges `data` over the row.
@@ -261,13 +221,6 @@ mod tests {
                     other => panic!("unknown write {other}"),
                 }
             }
-        }
-
-        /// The conditional delete a host's medium answers: whether this call removed the row.
-        fn delete_if_present(&mut self, id: &str) -> bool {
-            let before = self.0.len();
-            self.0.retain(|row| row["id"] != id);
-            self.0.len() != before
         }
 
         fn json(&self) -> String {
@@ -347,7 +300,7 @@ mod tests {
     #[test]
     fn replace_keeps_the_service_and_needs_a_stored_row_and_persist_creates_it_under_the_kernel_service(
     ) {
-        let mut medium = Medium::default();
+        let medium = Medium::default();
         let vault = medium.vault(&key("11"), None);
         assert!(vault
             .replace("TOKEN", "v", None)
@@ -450,21 +403,6 @@ mod tests {
         assert!(broken.take_writes().unwrap() == "[]", "nothing was written");
     }
 
-    /// A host's take: begin, the medium's conditional delete, then finish (or cancel when another taker won).
-    fn take(vault: &VaultApi, medium: &mut Medium, name: &str, now: f64) -> Option<String> {
-        let begun = vault.take_begin(name, None).unwrap()?;
-        let begun: Value = serde_json::from_str(&begun).unwrap();
-        assert_eq!(begun["write"], "delete");
-        assert_eq!(begun["ifPresent"], true);
-        let ticket = begun["ticket"].as_f64().unwrap();
-        if medium.delete_if_present(begun["id"].as_str().unwrap()) {
-            vault.take_finish(ticket, now).unwrap()
-        } else {
-            vault.take_cancel(ticket).unwrap();
-            None
-        }
-    }
-
     fn rotate_fails_naming(vault: &VaultApi, id: &str) -> bool {
         vault
             .rotate()
@@ -481,8 +419,6 @@ mod tests {
             .unwrap_err()
             .contains("not been loaded"));
         assert!(vault.set("s", "A", "v", None, None).is_err());
-        assert!(vault.hold("A", "v", 2.0, 1.0, None).is_err());
-        assert!(vault.take_begin("A", None).is_err());
         let refused = VaultApi::new(Some("not-a-key"), None)
             .err()
             .expect("a malformed key is refused");
@@ -495,81 +431,14 @@ mod tests {
     }
 
     #[test]
-    fn a_held_one_use_value_survives_a_restart_is_taken_once_and_an_expired_one_is_gone() {
-        let mut medium = Medium::default();
-        let vault = medium.vault(&key("11"), None);
-        vault
-            .hold("oauth:grant:S1", "GRANT-SECRET", 2000.0, 1000.0, None)
-            .unwrap();
-        medium.apply(&vault.take_writes().unwrap());
-        assert!(!medium.json().contains("GRANT-SECRET"));
-
-        let restarted = medium.vault(&key("11"), None);
-        assert_eq!(
-            take(&restarted, &mut medium, "oauth:grant:S1", 1500.0).as_deref(),
-            Some("GRANT-SECRET")
-        );
+    fn control_a_row_of_the_retired_derived_kind_fails_the_load_naming_it() {
+        let vault = VaultApi::new(Some(&key("11")), None).unwrap();
+        let failure = vault
+            .load(r#"[{"id":"held1","kind":"derived","envVar":"grant"}]"#)
+            .expect_err("a retired held-value row is a refusal");
         assert!(
-            restarted.take_writes().unwrap() == "[]",
-            "the delete was the host's conditional one, not a journaled write"
+            failure.contains("held1") && failure.contains("retired kind `derived`"),
+            "{failure}"
         );
-        let after = medium.vault(&key("11"), None);
-        assert_eq!(
-            take(&after, &mut medium, "oauth:grant:S1", 1500.0),
-            None,
-            "a take consumes it"
-        );
-
-        after.hold("late", "v", 1500.0, 1000.0, None).unwrap();
-        medium.apply(&after.take_writes().unwrap());
-        let last = medium.vault(&key("11"), None);
-        assert_eq!(
-            take(&last, &mut medium, "late", 1500.0),
-            None,
-            "an expired value is not returned"
-        );
-        assert!(medium.0.is_empty(), "and it is gone");
-    }
-
-    #[test]
-    fn two_instances_taking_one_held_row_get_exactly_one_value_and_a_lone_instance_gets_it() {
-        let mut medium = Medium::default();
-        let vault = medium.vault(&key("11"), None);
-        vault.hold("grant", "GRANT", 9000.0, 1000.0, None).unwrap();
-        medium.apply(&vault.take_writes().unwrap());
-
-        let (a, b) = (
-            medium.vault(&key("11"), None),
-            medium.vault(&key("11"), None),
-        );
-        let (ticket_a, ticket_b) = (
-            serde_json::from_str::<Value>(&a.take_begin("grant", None).unwrap().unwrap()).unwrap(),
-            serde_json::from_str::<Value>(&b.take_begin("grant", None).unwrap().unwrap()).unwrap(),
-        );
-        let first = medium.delete_if_present(ticket_a["id"].as_str().unwrap());
-        let second = medium.delete_if_present(ticket_b["id"].as_str().unwrap());
-        assert!(
-            first && !second,
-            "the medium's delete removes the row for one taker only"
-        );
-        assert_eq!(
-            a.take_finish(ticket_a["ticket"].as_f64().unwrap(), 2000.0)
-                .unwrap()
-                .as_deref(),
-            Some("GRANT")
-        );
-        b.take_cancel(ticket_b["ticket"].as_f64().unwrap()).unwrap();
-        assert!(b
-            .take_finish(ticket_b["ticket"].as_f64().unwrap(), 2000.0)
-            .is_err());
-
-        vault.hold("solo", "ONE", 9000.0, 1000.0, None).unwrap();
-        medium.apply(&vault.take_writes().unwrap());
-        let lone = medium.vault(&key("11"), None);
-        assert_eq!(
-            take(&lone, &mut medium, "solo", 2000.0).as_deref(),
-            Some("ONE")
-        );
-        assert_eq!(a.take_begin("none", None).unwrap(), None);
     }
 }
