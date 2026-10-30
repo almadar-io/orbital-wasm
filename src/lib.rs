@@ -12,6 +12,17 @@ use api::{KernelApi, ServerApi};
 
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str);
+}
+
+#[wasm_bindgen(start)]
+fn report_panics() {
+    std::panic::set_hook(Box::new(|info| console_error(&info.to_string())));
+}
+
 fn js(error: impl std::fmt::Display) -> JsError {
     JsError::new(&error.to_string())
 }

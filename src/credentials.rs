@@ -316,6 +316,7 @@ mod tests {
         );
         let listing: Value = serde_json::from_str(&vault.listing().unwrap()).unwrap();
         assert_eq!(listing["entries"][0]["service"], "google");
+        assert_eq!(listing["entries"][0]["last4"], "0002", "a secret of eight characters shows its last four");
         vault
             .persist("SESSION", "s-1111", None, Some("ada@example.com"))
             .unwrap();

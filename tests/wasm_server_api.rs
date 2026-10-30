@@ -379,3 +379,101 @@ fn control_an_unknown_trait_surface_is_refused_and_recorded_on_the_kernel_api() 
     assert_eq!(kernel.last_error(), err);
     assert!(kernel.contract_query("{not json").is_err());
 }
+
+fn lambda_effects() -> Value {
+    serde_json::from_str(r#"[
+        ["set", "@entity.id", "me"],
+        ["set", "@entity.ok", ["validate/email", "a@b.co"]],
+        ["set", "@entity.mood", ["if", ["=", ["object/get", ["default", ["array/first", "@payload.data"], {}], "mood", ""], ""], "calm", ["object/get", ["default", ["array/first", "@payload.data"], {}], "mood"]]],
+        ["set", "@entity.trusted", ["object/get", ["default", ["array/first", "@payload.data"], {}], "trustedChannels", []]],
+        ["emit", "MOOD_SET", { "mood": "@entity.mood", "hide": ["object/get", ["default", ["array/find", ["list", { "name": "a" }], ["fn", "m", ["=", ["object/get", "@m", "name"], "@entity.mood"]]], {}], "hide", []], "paused": ["object/get", ["default", ["array/first", "@payload.data"], {}], "paused", false] }],
+        ["render-ui", "main", { "type": "stack", "children": [
+            { "type": "page-header", "title": "Feed", "icon": "leaf" },
+            { "type": "stack", "children": ["array/map", ["list", { "name": "a" }], ["fn", "m", { "type": "button", "label": ["object/get", "@m", "name"], "action": "CHOOSE_MOOD", "actionPayload": { "mood": ["object/get", "@m", "name"] }, "variant": ["if", ["=", ["object/get", "@m", "name"], "@entity.mood"], "primary", "ghost"] }]] },
+            { "type": "typography", "content": ["str/concat", "Hiding ", ["str/join", ["object/get", ["default", ["array/find", ["list", { "name": "a" }], ["fn", "m", ["=", ["object/get", "@m", "name"], "@entity.mood"]]], {}], "hide", []], ", "]] }
+        ] }]
+    ]"#).unwrap()
+}
+
+fn lambda_program() -> Value {
+    json!({
+        "name": "lambdas",
+        "typeContractVersion": 1,
+        "_metadata": { "dispatchFacts": { "busExcluded": [], "targetOptions": [] }, "protocols": [{ "name": "route", "address": null, "viewer": false, "grant": null, "side": "client" }] },
+        "orbitals": [{
+            "name": "Main",
+            "entity": { "name": "Note", "persistence": "persistent", "collection": "notes", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [{
+                "name": "Pick", "linkedEntity": "Note",
+                "emits": [
+                    { "event": "PROFILE_LOADED", "payloadSchema": [{ "name": "data", "type": "array", "items": { "type": "Note" } }] },
+                    { "event": "MOOD_SET", "payloadSchema": [{ "name": "mood", "type": "string" }, { "name": "hide", "type": "array", "items": { "type": "string" } }, { "name": "paused", "type": "boolean" }] }
+                ],
+                "stateMachine": {
+                    "states": [{ "name": "idle", "isInitial": true }, { "name": "picked" }],
+                    "transitions": [
+                        { "from": "idle", "to": "idle", "event": "PICK", "effects": [["fetch", "Note", { "emit": { "success": "PROFILE_LOADED", "failure": "PROFILE_FAILED" } }]] },
+                        { "from": "idle", "to": "picked", "event": "PROFILE_LOADED", "effects": lambda_effects() }
+                    ]
+                }
+            }]
+        }]
+    })
+}
+
+const NO_LANGUAGE_CHILD: &str = "ORBITAL_WASM_TEST_NO_LANGUAGE";
+
+fn pick(api: &ServerApi) -> Result<String, String> {
+    let mut step = api.start("Main", &json!({ "event": "PICK", "targetTrait": "Pick" }).to_string())?;
+    loop {
+        let value = progress(&step);
+        if value["status"] != "await" {
+            return Ok(step);
+        }
+        let replies: Vec<Value> = value["requests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|pending| answer(pending, &|data| json!({ "ok": data }), &|_| json!({ "ok": { "id": "singleton" } })))
+            .collect();
+        step = api.resume(value["flight"].as_u64().unwrap(), &Value::Array(replies).to_string())?;
+    }
+}
+
+#[test]
+fn a_program_with_lambdas_answers_the_typed_error_without_a_language_bundle_and_the_server_stays_usable() {
+    if std::env::var_os(NO_LANGUAGE_CHILD).is_none() {
+        let empty = std::env::temp_dir().join(format!("orbital-wasm-no-language-{}", std::process::id()));
+        std::fs::create_dir_all(&empty).unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "--nocapture", "--test-threads=1"])
+            .arg("a_program_with_lambdas_answers_the_typed_error_without_a_language_bundle_and_the_server_stays_usable")
+            .env(NO_LANGUAGE_CHILD, "1")
+            .env("HOME", &empty)
+            .env("USERPROFILE", &empty)
+            .current_dir(&empty)
+            .output()
+            .unwrap();
+        std::fs::remove_dir_all(&empty).ok();
+        assert!(output.status.success(), "{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        return;
+    }
+    let api = ServerApi::new(&lambda_program().to_string()).unwrap();
+    let rejected = |api: &ServerApi| {
+        let step = progress(&pick(api).unwrap());
+        step["response"]["rejections"][0]["error"].as_str().unwrap_or_default().to_string()
+    };
+    let error = rejected(&api);
+    assert!(error.contains("_NOT_INSTALLED"), "{error}");
+    assert!(pick(&api).is_ok(), "the server answers a following call");
+}
+
+#[test]
+fn control_the_same_lambda_program_runs_with_the_language_installed() {
+    let bundle = orbital_core::language_data::language_bundle_json().unwrap();
+    install_language(&bundle).unwrap();
+    let api = ServerApi::new(&lambda_program().to_string()).unwrap();
+    let step = progress(&pick(&api).unwrap());
+    assert_eq!(step["status"], "done", "{step:#}");
+    assert_eq!(api.get_state("Pick", None), "picked");
+}
