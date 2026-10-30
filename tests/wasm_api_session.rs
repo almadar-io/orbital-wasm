@@ -2,7 +2,7 @@
 //! and must produce the C-ABI goldens recorded in orbital-core.
 
 use orbital_wasm::api::{
-    check_mutation_access, evaluate_guards, evaluate_many, evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows,
+    check_mutation_access, contract_query_without_program, evaluate_guards, evaluate_many, evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows,
     trace_effects, KernelApi, ServerApi,
 };
 use serde_json::{json, Value};
@@ -140,6 +140,15 @@ fn an_empty_schema_is_refused() {
         err,
         Some(orbital_wasm::api::ApiError::Entry(orbital_core::runtime::kernel::EntryError::NoOrbitals))
     ));
+}
+
+#[test]
+fn a_host_with_no_program_asks_the_kernel_for_the_empty_answers() {
+    let ask = |q: &str| contract_query_without_program(q);
+    assert!(pj(&ask(r#"{"kind":"findExternalInput","orbital":"Cal","trait":"Push","event":"ADD"}"#).unwrap()).is_null());
+    assert_eq!(pj(&ask(r#"{"kind":"externalInputs"}"#).unwrap()), json!([]));
+    assert_eq!(pj(&ask(r#"{"kind":"findInbound","name":"hook"}"#).unwrap())["answer"]["status"], 404);
+    assert!(ask("{not json").is_err(), "control: a malformed query is a typed refusal");
 }
 
 #[test]
@@ -583,7 +592,7 @@ fn fired_names(kernel: &KernelApi, now_ms: u64) -> Vec<String> {
     let mut names: Vec<String> = kernel
         .frame(now_ms)
         .unwrap()
-        .map(|wire| parsed(&wire)["fired"].as_array().unwrap().iter().map(|t| t["trait"].as_str().unwrap().to_string()).collect())
+        .map(|wire| parsed(&wire)["fired"].as_object().unwrap().values().flat_map(|ticks| ticks.as_array().unwrap()).map(|t| t["trait"].as_str().unwrap().to_string()).collect())
         .unwrap_or_default();
     names.sort();
     names

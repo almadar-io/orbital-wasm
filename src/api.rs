@@ -410,6 +410,20 @@ impl KernelApi {
         self.record(to_json(&self.embedded.route_mounts(route_path)))
     }
 
+    /// The circuit a client mounts for `page` or `route` (neither: the initial page), a `PageCircuit` as JSON.
+    pub fn page_circuit(&self, page: Option<&str>, route: Option<&str>) -> Result<String, String> {
+        self.record(self.embedded.page_circuit(page, route).and_then(|c| to_json(&c)))
+    }
+
+    /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
+    pub fn contract_query(&self, query_json: &str) -> Result<String, String> {
+        self.record(
+            parse::<orbital_core::runtime::kernel::contract_query::ContractQuery>(query_json, "query_json")
+                .and_then(|query| self.embedded.contract_query(query))
+                .and_then(|answer| to_json(&answer)),
+        )
+    }
+
     /// The legs that release the traits of `traits_json` the page had entered (`Left[]` as JSON).
     pub fn unmount(&self, traits_json: &str) -> Result<String, String> {
         self.record(
@@ -626,6 +640,11 @@ impl ServerApi {
         self.record(to_json(&self.embedded.route_mounts(route_path)))
     }
 
+    /// The circuit a client mounts for `page` or `route` (neither: the initial page), a `PageCircuit` as JSON.
+    pub fn page_circuit(&self, page: Option<&str>, route: Option<&str>) -> Result<String, String> {
+        self.record(self.embedded.page_circuit(page, route).and_then(|c| to_json(&c)))
+    }
+
     /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
     pub fn contract_query(&self, query_json: &str) -> Result<String, String> {
         self.record(
@@ -675,8 +694,8 @@ impl ServerApi {
         self.record(to_json(&self.embedded.flush_tick_relay()))
     }
 
-    /// One tick pass at monotonic `now_ms`: the `(trait, tick)` pairs due now that this server runs, as
-    /// `FiredTick` JSON (`EmbeddedServer::tick_pass`).
+    /// One tick pass at monotonic `now_ms`: the `(trait, tick)` pairs due now that this server runs, by orbital, as
+    /// `{ [orbital]: FiredTick[] }` JSON (`EmbeddedServer::tick_pass`).
     pub fn tick_pass(&self, now_ms: u64) -> Result<String, String> {
         self.record(to_json(&self.embedded.tick_pass(now_ms)))
     }
@@ -742,6 +761,13 @@ pub fn event_wires(schema_json: &str) -> Result<String, String> {
 
 pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
     orbital_core::embed::tab_url_matches(pattern, url)
+}
+
+/// One question (a `ContractQuery` as JSON) for a host with no registered program: the kernel's answer on an empty kernel, as JSON.
+pub fn contract_query_without_program(query_json: &str) -> Result<String, String> {
+    parse::<orbital_core::runtime::kernel::contract_query::ContractQuery>(query_json, "query_json")
+        .and_then(orbital_core::embed::contract_query_without_program)
+        .and_then(|answer| to_json(&answer))
 }
 
 /// The names of the `os/` operations whose keyed call may defer its completion, as a JSON array.

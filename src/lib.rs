@@ -274,6 +274,16 @@ impl Kernel {
         self.api.route_mounts(route_path).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = pageCircuit)]
+    pub fn page_circuit(&self, page: Option<String>, route: Option<String>) -> Result<String, JsError> {
+        self.api.page_circuit(page.as_deref(), route.as_deref()).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = contractQuery)]
+    pub fn contract_query(&self, query_json: &str) -> Result<String, JsError> {
+        self.api.contract_query(query_json).map_err(js)
+    }
+
     pub fn unmount(&self, traits_json: &str) -> Result<String, JsError> {
         self.api.unmount(traits_json).map_err(js)
     }
@@ -428,6 +438,11 @@ impl Server {
     #[wasm_bindgen(js_name = routeMounts)]
     pub fn route_mounts(&self, route_path: &str) -> Result<String, JsError> {
         self.api.route_mounts(route_path).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = pageCircuit)]
+    pub fn page_circuit(&self, page: Option<String>, route: Option<String>) -> Result<String, JsError> {
+        self.api.page_circuit(page.as_deref(), route.as_deref()).map_err(js)
     }
 
     /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
@@ -657,6 +672,12 @@ pub fn event_wires(schema_json: &str) -> Result<String, JsError> {
 #[wasm_bindgen(js_name = tabUrlMatches)]
 pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
     api::tab_url_matches(pattern, url)
+}
+
+/// One `ContractQuery` (as JSON) answered for a host with no registered program, as JSON.
+#[wasm_bindgen(js_name = contractQueryWithoutProgram)]
+pub fn contract_query_without_program(query_json: &str) -> Result<String, JsError> {
+    api::contract_query_without_program(query_json).map_err(js)
 }
 
 /// The names of the `os/` operations whose keyed call may defer its completion, as a JSON array.

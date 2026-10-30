@@ -333,3 +333,49 @@ fn a_kernel_opening_a_route_gets_only_that_routes_traits_and_the_client_side_boo
     assert_eq!(kernel.route_mounts("/missing").unwrap(), "[]");
     assert_eq!(kernel.boot_mounts("client").unwrap(), "[]");
 }
+
+#[test]
+fn the_page_circuit_is_the_kernels_for_the_server_and_kernel_apis() {
+    let program = endpoint_program().to_string();
+    let api = ServerApi::new(&program).unwrap();
+    let kernel = orbital_wasm::api::KernelApi::new(&program, "c1").unwrap();
+    let by_route: Value = serde_json::from_str(&api.page_circuit(None, Some("/")).unwrap()).unwrap();
+    assert_eq!(by_route["page"], "Home");
+    assert_eq!(by_route["notFound"], false);
+    assert_eq!(by_route["mounts"], json!([{ "trait": "ViewT", "event": "INIT" }]));
+    assert_eq!(by_route["orbitalByTrait"], json!({ "ViewT": "Main" }));
+    let by_name: Value = serde_json::from_str(&kernel.page_circuit(Some("Home"), None).unwrap()).unwrap();
+    assert_eq!(by_name["page"], "Home");
+    assert_eq!(by_name["linkedEntityByTrait"], json!({ "ViewT": "Note" }));
+}
+
+#[test]
+fn control_an_unknown_page_is_refused_and_recorded() {
+    let program = endpoint_program().to_string();
+    let api = ServerApi::new(&program).unwrap();
+    assert!(api.page_circuit(Some("Nope"), None).is_err());
+    assert!(api.last_error().contains("unknown page: Nope"));
+    let kernel = orbital_wasm::api::KernelApi::new(&program, "c1").unwrap();
+    assert!(kernel.page_circuit(Some("Nope"), None).unwrap_err().contains("unknown page"));
+}
+
+#[test]
+fn the_trait_surface_is_the_kernels_for_the_kernel_api() {
+    let program = endpoint_program().to_string();
+    let kernel = orbital_wasm::api::KernelApi::new(&program, "c1").unwrap();
+    let surface: Value = serde_json::from_str(&kernel.contract_query(r#"{"kind":"traitSurface","trait":"ViewT"}"#).unwrap()).unwrap();
+    assert_eq!(surface["orbital"], "Main");
+    assert_eq!(surface["entity"], "Note");
+    assert_eq!(surface["initial"], "a");
+    let server = ServerApi::new(&program).unwrap();
+    let served: Value = serde_json::from_str(&server.contract_query(r#"{"kind":"traitSurface","trait":"ViewT"}"#).unwrap()).unwrap();
+    assert_eq!(surface, served);
+}
+
+#[test]
+fn control_an_unknown_trait_surface_is_refused_and_recorded_on_the_kernel_api() {
+    let kernel = orbital_wasm::api::KernelApi::new(&endpoint_program().to_string(), "c1").unwrap();
+    let err = kernel.contract_query(r#"{"kind":"traitSurface","trait":"Nope"}"#).unwrap_err();
+    assert_eq!(kernel.last_error(), err);
+    assert!(kernel.contract_query("{not json").is_err());
+}
