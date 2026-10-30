@@ -503,6 +503,56 @@ fn the_client_kernel_paints_i18n_from_the_catalogs_the_host_sets() {
     assert!(wire["response"]["clientEffectsByTrait"].to_string().contains("\"Hello\""), "{wire:#}");
 }
 
+fn sign_out_schema(sites: Value, effects: Value) -> String {
+    json!({
+        "name": "site",
+        "typeContractVersion": 1,
+        "_metadata": { "operatorSites": sites },
+        "orbitals": [{
+            "name": "Home",
+            "entity": { "name": "HomeView", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [{
+                "name": "Chrome", "linkedEntity": "HomeView",
+                "stateMachine": {
+                    "states": [{ "name": "idle", "isInitial": true }],
+                    "transitions": [{ "from": "idle", "to": "idle", "event": "SIGN_OUT",
+                        "effects": effects }]
+                }
+            }]
+        }]
+    })
+    .to_string()
+}
+
+#[test]
+fn the_client_kernel_hands_a_client_site_host_port_effect_back_as_a_host_ask() {
+    let kernel = KernelApi::new(&sign_out_schema(json!({ "auth/sign-out": "client", "audio/play-sound": "client" }), json!([["audio/play-sound", "bye"], ["auth/sign-out"]])), "c1").unwrap();
+    let wire = parsed(&kernel.dispatch("Chrome", None, "SIGN_OUT", None).unwrap());
+    let effects: Vec<&Value> = wire["response"]["clientEffectsByTrait"].as_array().expect("client effects").iter().map(|e| &e["effect"]).collect();
+    assert_eq!(effects, vec![&json!(["host-ask", "audio/play-sound", ["bye"]]), &json!(["host-ask", "auth/sign-out", []])], "{wire:#}");
+    assert!(wire["serverLegs"].as_array().is_none_or(Vec::is_empty), "control: a client-site ask posts no server leg: {wire:#}");
+}
+
+#[test]
+fn the_client_kernel_hands_a_routed_host_ask_back_with_its_return_address() {
+    let sign_in = json!(["auth/sign-in", { "method": "google" }, { "key": "k1", "emit": { "success": "SIGNED_IN", "failure": "SIGN_IN_FAILED" } }]);
+    let kernel = KernelApi::new(&sign_out_schema(json!({ "auth/sign-in": "client" }), json!([sign_in])), "c1").unwrap();
+    let wire = parsed(&kernel.dispatch("Chrome", None, "SIGN_OUT", None).unwrap());
+    let effects: Vec<&Value> = wire["response"]["clientEffectsByTrait"].as_array().expect("client effects").iter().map(|e| &e["effect"]).collect();
+    assert_eq!(
+        effects,
+        vec![&json!(["host-ask", "auth/sign-in", [{ "method": "google" }], { "trait": "Chrome", "key": "k1", "success": "SIGNED_IN", "failure": "SIGN_IN_FAILED" }])],
+        "{wire:#}"
+    );
+}
+
+#[test]
+fn control_a_server_site_effect_is_never_a_host_ask() {
+    let kernel = KernelApi::new(&sign_out_schema(json!({}), json!([["persist", "create", "HomeView", {}]])), "c1").unwrap();
+    let wire = parsed(&kernel.dispatch("Chrome", None, "SIGN_OUT", None).unwrap());
+    assert!(!wire["response"].to_string().contains("host-ask"), "{wire:#}");
+}
+
 #[test]
 fn control_a_malformed_catalog_is_refused_by_name() {
     let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
