@@ -102,11 +102,11 @@ test('a tick fires only while a client holds its trait, and the ledger is driven
   assert.throws(() => server.mountClient('tab-1', 'Board', 'not json'), /traits_json/);
 });
 
-test('a fired tick names its declaring orbital, and the coalesced relay keeps the newest per key', async () => {
+test('fired ticks are grouped by their declaring orbital (EXEC-TICK-6), and the coalesced relay keeps the newest per key', async () => {
   const server = new Server(tickSchema);
   server.mountClient('tab-1', 'Board', '["Scoped"]');
-  assert.deepEqual(JSON.parse(server.tickPass(0)), []);
-  assert.deepEqual(JSON.parse(server.tickPass(10)), [{ orbital: 'Board', trait: 'Scoped', tick: 'beat' }]);
+  assert.deepEqual(JSON.parse(server.tickPass(0)), {});
+  assert.deepEqual(JSON.parse(server.tickPass(10)), { Board: [{ trait: 'Scoped', tick: 'beat' }] });
   const stamped = (x) => JSON.stringify({ event: 'MOVED', payload: { x }, clientId: 'tab-1', tick: 'beat', sourceTrait: 'Scoped' });
   assert.equal(JSON.parse(server.relayTick('Board', stamped(1))), 50);
   assert.equal(JSON.parse(server.relayTick('Board', stamped(2))), null);
