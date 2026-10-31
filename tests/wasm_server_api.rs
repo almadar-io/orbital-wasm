@@ -134,13 +134,10 @@ fn a_failed_call_is_the_error_and_the_last_error() {
 }
 
 #[test]
-fn the_default_user_and_the_mount_are_set_by_json() {
+fn the_mount_is_set_by_json() {
     let api = ServerApi::new(&schema().to_string()).unwrap();
-    api.set_default_user(r#"{"id":"u1","role":"admin"}"#)
-        .unwrap();
     api.mount(r#"["Draft"]"#).unwrap();
     api.remount(r#"[]"#).unwrap();
-    assert!(api.set_default_user("{").is_err());
     assert!(api.mount("not json").is_err());
 }
 
@@ -215,9 +212,12 @@ fn a_browser_host_matches_tab_urls_with_the_kernels_one_rule() {
 #[test]
 fn a_host_parses_a_dispatch_request_with_the_kernels_typed_parse() {
     use orbital_wasm::api::parse_event_request;
-    let options = json!({ "event": "SAVE", "targetTrait": "Draft", "entityId": "", "viewer": { "id": "u1" } }).to_string();
+    let options = json!({ "event": "SAVE", "targetTrait": "Draft", "entityId": "" }).to_string();
     let parsed: Value = serde_json::from_str(&parse_event_request("{\"n\":\"x\"}", &options).unwrap()).unwrap();
-    assert_eq!(parsed, json!({ "event": "SAVE", "payload": { "n": "x" }, "targetTrait": "Draft", "user": { "id": "u1" } }));
+    assert_eq!(parsed, json!({ "event": "SAVE", "payload": { "n": "x" }, "targetTrait": "Draft" }));
+    let viewer = json!({ "event": "SAVE", "viewer": { "id": "u1" } }).to_string();
+    let retired = parse_event_request("{}", &viewer).unwrap_err();
+    assert!(retired.contains("`viewer` is retired"), "{retired}");
     let refused = parse_event_request("{}", "{}").unwrap_err();
     assert!(refused.starts_with("program/dispatch: not an event request: "), "{refused}");
 }

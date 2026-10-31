@@ -124,8 +124,8 @@ impl StoredServer {
         self.api.close_session_stream(id)
     }
 
-    pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
-        let progress = self.api.resolve_rows(ref_json, viewer_json)?;
+    pub fn resolve_rows(&self, ref_json: &str, client_id: Option<&str>) -> Result<String, String> {
+        let progress = self.api.resolve_rows(ref_json, client_id)?;
         self.pump(progress, Flight::Resolve)
     }
 
@@ -275,8 +275,8 @@ impl ServerHandle {
         self.0.close_session_stream(id)
     }
 
-    pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
-        self.0.resolve_rows(ref_json, viewer_json)
+    pub fn resolve_rows(&self, ref_json: &str, client_id: Option<&str>) -> Result<String, String> {
+        self.0.resolve_rows(ref_json, client_id)
     }
 
     pub fn resume_resolve(&self, flight: u64, replies_json: &str) -> Result<String, String> {

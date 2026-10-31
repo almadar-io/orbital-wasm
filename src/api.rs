@@ -325,12 +325,6 @@ impl KernelApi {
         self.record(parse_theme_mode(mode).map(|m| self.embedded.set_theme_mode(m)))
     }
 
-    pub fn set_current_user(&self, user_json: &str) -> Result<(), String> {
-        self.record(
-            parse::<Value>(user_json, "user_json").map(|u| self.embedded.set_current_user(u)),
-        )
-    }
-
     /// The host runs the listeners of every emit it marks `dispatched` (a worklist host).
     pub fn set_host_fans_out(&self, fans_out: bool) {
         self.embedded.set_host_fans_out(fans_out);
@@ -523,8 +517,8 @@ impl ServerApi {
         self.record(self.embedded.tls_complete_json(key, outcome_json))
     }
 
-    pub fn live_item_delivered(&self, item_json: &str, viewer_json: &str, client_id: Option<&str>) -> Result<bool, String> {
-        self.record(self.embedded.live_item_delivered(item_json, viewer_json, client_id))
+    pub fn live_item_delivered(&self, item_json: &str, client_id: Option<&str>) -> Result<bool, String> {
+        self.record(self.embedded.live_item_delivered(item_json, client_id))
     }
 
     pub fn dispatch_stream(&self) -> Result<String, String> {
@@ -561,10 +555,10 @@ impl ServerApi {
         self.embedded.close_session_stream(id)
     }
 
-    /// Resolve a row-set reference (`RowSetRef` as JSON) for a viewer (a user as JSON) through the host-answered
-    /// store; a `ResolveProgressWire` as JSON.
-    pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, String> {
-        self.record(self.embedded.resolve_rows_json(ref_json, viewer_json))
+    /// Resolve a row-set reference (`RowSetRef` as JSON) through the host-answered store, for the identity bound to the
+    /// session `client_id` names; a `ResolveProgressWire` as JSON.
+    pub fn resolve_rows(&self, ref_json: &str, client_id: Option<&str>) -> Result<String, String> {
+        self.record(self.embedded.resolve_rows_json(ref_json, client_id))
     }
 
     /// Answer the requests a resolve flight is waiting on (`IoReplyWire[]` as JSON); a `ResolveProgressWire` as JSON.
@@ -582,12 +576,6 @@ impl ServerApi {
 
     pub fn get_state(&self, trait_name: &str, entity_id: Option<&str>) -> String {
         self.embedded.get_state(trait_name, entity_id)
-    }
-
-    pub fn set_default_user(&self, user_json: &str) -> Result<(), String> {
-        self.record(
-            parse::<Value>(user_json, "user_json").map(|u| self.embedded.set_default_user(u)),
-        )
     }
 
     /// The program (as JSON) whose declared credentials this server's credential effects manage beside its own.

@@ -62,10 +62,6 @@ fn step(kernel: &KernelApi, step: &Value) -> Value {
             let _ = kernel.set_theme_mode(s("mode"));
             Value::Null
         }
-        "setUser" => {
-            let _ = kernel.set_current_user(&text("user"));
-            Value::Null
-        }
         "seed" => {
             let _ = kernel.seed(s("entityType"), &text("rows"));
             Value::Null
@@ -159,7 +155,7 @@ fn a_failed_call_is_the_error_and_the_last_error() {
         .dispatch("NoSuchTrait", None, "INIT", None)
         .unwrap_err();
     assert_eq!(kernel.last_error(), err);
-    assert!(kernel.set_current_user("{not json").is_err());
+    assert!(kernel.seed("Task", "{not json").is_err());
 }
 
 #[test]

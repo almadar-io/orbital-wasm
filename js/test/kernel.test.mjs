@@ -72,8 +72,6 @@ function run(script) {
         return json(kernel.snapshot());
       case 'setThemeMode':
         return note(() => kernel.setThemeMode(s.mode));
-      case 'setUser':
-        return note(() => kernel.setCurrentUser(text(s.user)));
       case 'seed':
         return note(() => kernel.seed(s.entityType, text(s.rows)));
       case 'remount':
@@ -113,7 +111,7 @@ test('a failed call throws an Error carrying the last_error message', () => {
     assert.equal(kernel.lastError(), e.message);
     return true;
   });
-  assert.throws(() => kernel.setCurrentUser('{not json'), /parse user_json/);
+  assert.throws(() => kernel.seed('Task', '{not json'), /parse rows_json/);
 });
 
 test('an empty schema is refused at construction', () => {

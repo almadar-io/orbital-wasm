@@ -220,11 +220,6 @@ impl Kernel {
         self.api.set_theme_mode(mode).map_err(js)
     }
 
-    #[wasm_bindgen(js_name = setCurrentUser)]
-    pub fn set_current_user(&self, user_json: &str) -> Result<(), JsError> {
-        self.api.set_current_user(user_json).map_err(js)
-    }
-
     /// The host runs the listeners of every emit it marks `dispatched` (the JS runtime, `orbital-server`).
     #[wasm_bindgen(js_name = setHostFansOut)]
     pub fn set_host_fans_out(&self, fans_out: bool) {
@@ -411,8 +406,8 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = liveItemDelivered)]
-    pub fn live_item_delivered(&self, item_json: &str, viewer_json: &str, client_id: Option<String>) -> Result<bool, JsError> {
-        self.api.live_item_delivered(item_json, viewer_json, client_id.as_deref()).map_err(js)
+    pub fn live_item_delivered(&self, item_json: &str, client_id: Option<String>) -> Result<bool, JsError> {
+        self.api.live_item_delivered(item_json, client_id.as_deref()).map_err(js)
     }
 
     #[wasm_bindgen(js_name = dispatchStream)]
@@ -421,8 +416,8 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = resolveRows)]
-    pub fn resolve_rows(&self, ref_json: &str, viewer_json: &str) -> Result<String, JsError> {
-        self.api.resolve_rows(ref_json, viewer_json).map_err(js)
+    pub fn resolve_rows(&self, ref_json: &str, client_id: Option<String>) -> Result<String, JsError> {
+        self.api.resolve_rows(ref_json, client_id.as_deref()).map_err(js)
     }
 
     #[wasm_bindgen(js_name = resumeResolve)]
@@ -470,11 +465,6 @@ impl Server {
     #[wasm_bindgen(js_name = setManagedProgram)]
     pub fn set_managed_program(&self, program_json: &str) -> Result<(), JsError> {
         self.api.set_managed_program(program_json).map_err(js)
-    }
-
-    #[wasm_bindgen(js_name = setDefaultUser)]
-    pub fn set_default_user(&self, user_json: &str) -> Result<(), JsError> {
-        self.api.set_default_user(user_json).map_err(js)
     }
 
     pub fn mount(&self, traits_json: &str) -> Result<(), JsError> {
