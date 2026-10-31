@@ -503,6 +503,11 @@ impl ServerApi {
         self.record(self.embedded.os_allows_json(requirement_json))
     }
 
+    /// Whether `url`'s origin is declared in the program's `egress`.
+    pub fn egress_allows(&self, url: &str) -> bool {
+        self.embedded.egress_allows(url)
+    }
+
     /// Place the program's anchored grants and arguments under the host's anchors; answers what grants nothing.
     pub fn set_os_anchors(&self, anchors_json: &str) -> Result<String, String> {
         self.record(self.embedded.set_os_anchors_json(anchors_json))

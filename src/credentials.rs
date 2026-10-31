@@ -3,12 +3,17 @@
 //! and records every change as a write; the host lists, `load`s, runs an operation, then applies `take_writes` to its
 //! medium in order. The master key is given by the host and the IVs are the kernel's own. Every rule is the store's.
 
+use orbital_core::credential_admin::{ConnectFailure, ConnectFailureKind, CredentialGrant};
+use orbital_core::embed::wire::CredentialGrantWire;
 use orbital_core::runtime::credential_store::{
-    is_master_key, EncryptedCredentialStore, RecordedCredentialRows,
+    is_master_key, EncryptedCredentialStore, ExchangeTicket, PendingExchange,
+    RecordedCredentialRows, RefreshStart,
 };
 use serde_json::{json, Map, Value};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 /// The service label a kernel-persisted credential (an OAuth connection) carries in the store.
 const PERSISTED_SERVICE: &str = "kernel";
@@ -17,6 +22,14 @@ pub struct VaultApi {
     store: EncryptedCredentialStore,
     rows: Arc<RecordedCredentialRows>,
     loaded: AtomicBool,
+    tickets: Mutex<Tickets>,
+}
+
+/// The exchanges begun and not yet finished, behind opaque handle numbers: a ticket never leaves this vault.
+#[derive(Default)]
+struct Tickets {
+    next: u64,
+    held: HashMap<u64, ExchangeTicket>,
 }
 
 fn out<T: serde::Serialize>(value: &T) -> Result<String, String> {
@@ -37,6 +50,7 @@ impl VaultApi {
             store: EncryptedCredentialStore::new(rows.clone(), master, previous),
             rows,
             loaded: AtomicBool::new(false),
+            tickets: Mutex::new(Tickets::default()),
         })
     }
 
@@ -180,6 +194,100 @@ impl VaultApi {
         out(&self.store.rotate()?)
     }
 
+    fn exchange_json(&self, pending: PendingExchange) -> Result<Value, String> {
+        let PendingExchange {
+            endpoint,
+            headers,
+            body,
+            ticket,
+        } = pending;
+        let mut tickets = self
+            .tickets
+            .lock()
+            .map_err(|_| "the exchange table lock is poisoned".to_string())?;
+        tickets.next += 1;
+        let handle = tickets.next;
+        tickets.held.insert(handle, ticket);
+        let headers: Vec<Value> = headers
+            .into_iter()
+            .map(|(name, value)| json!([name, value]))
+            .collect();
+        Ok(json!({ "endpoint": endpoint, "headers": headers, "body": body, "ticket": handle }))
+    }
+
+    fn settled<T: serde::Serialize>(result: Result<T, ConnectFailure>) -> Result<String, String> {
+        match result {
+            Ok(value) => out(&json!({ "ok": value })),
+            Err(failure) => out(&json!({ "error": failure })),
+        }
+    }
+
+    fn unready(&self) -> Option<ConnectFailure> {
+        self.ready()
+            .err()
+            .map(|message| ConnectFailure::new(ConnectFailureKind::Unavailable, message))
+    }
+
+    /// The request to send for a `credentialConnect` grant (the wire JSON the kernel asked with) and the handle to finish it
+    /// with: `{ ok: { endpoint, headers: [[name, value]], body, ticket } }` or `{ error: { kind, message } }`. Nothing is
+    /// persisted until [`Self::connect_finish`].
+    pub fn connect_begin(&self, grant_json: &str) -> Result<String, String> {
+        let wire: CredentialGrantWire =
+            serde_json::from_str(grant_json).map_err(|e| format!("parse grant: {e}"))?;
+        if let Some(failure) = self.unready() {
+            return Self::settled::<Value>(Err(failure));
+        }
+        let begun = self.store.connect_begin(&CredentialGrant::from(wire));
+        match begun {
+            Ok(pending) => Self::settled(Ok(self.exchange_json(pending)?)),
+            Err(failure) => Self::settled::<Value>(Err(failure)),
+        }
+    }
+
+    /// The first half of a refresh-on-resolve: `{ ok: { resolved: string | null } }` when nothing needs sending, else
+    /// `{ ok: { exchange: { endpoint, headers, body, ticket } } }`. The host serializes concurrent calls per credential.
+    pub fn refresh_begin(&self, name: &str, principal: Option<&str>) -> Result<String, String> {
+        if let Some(failure) = self.unready() {
+            return Self::settled::<Value>(Err(failure));
+        }
+        match self.store.refresh_begin(name, principal) {
+            Ok(RefreshStart::Resolved(value)) => Self::settled(Ok(json!({ "resolved": value }))),
+            Ok(RefreshStart::Exchange(pending)) => {
+                Self::settled(Ok(json!({ "exchange": self.exchange_json(pending)? })))
+            }
+            Err(failure) => Self::settled::<Value>(Err(failure)),
+        }
+    }
+
+    /// Settle an exchange with the endpoint's status and body: `{ ok: { connected, label? } }` or `{ error }`. The handle is
+    /// consumed; an unknown or already used one is refused.
+    pub fn connect_finish(&self, ticket: u64, status: u16, body: &str) -> Result<String, String> {
+        let held = self
+            .tickets
+            .lock()
+            .map_err(|_| "the exchange table lock is poisoned".to_string())?
+            .held
+            .remove(&ticket);
+        let Some(held) = held else {
+            return Self::settled::<Value>(Err(ConnectFailure::new(
+                ConnectFailureKind::Refused,
+                "credential-connect: unknown exchange ticket",
+            )));
+        };
+        Self::settled(self.store.connect_finish(held, status, body))
+    }
+
+    /// Drop a begun exchange the host could not send (a transport failure), so its handle does not linger.
+    pub fn connect_abandon(&self, ticket: u64) -> Result<bool, String> {
+        Ok(self
+            .tickets
+            .lock()
+            .map_err(|_| "the exchange table lock is poisoned".to_string())?
+            .held
+            .remove(&ticket)
+            .is_some())
+    }
+
     /// The writes since the last call, in order, for the host to apply to its medium:
     /// `[{ write: "create", id, data } | { write: "update", id, data } | { write: "delete", id }]`. A created row carries
     /// the id in `data`; an update merges `data` over the row.
@@ -232,6 +340,48 @@ mod tests {
             vault.load(&self.json()).unwrap();
             vault
         }
+    }
+
+    #[test]
+    fn a_finish_with_an_unknown_or_used_ticket_is_refused() {
+        let vault = Medium::default().vault(&key("11"), None);
+        let unknown: Value =
+            serde_json::from_str(&vault.connect_finish(99, 200, "{}").unwrap()).unwrap();
+        assert_eq!(unknown["error"]["kind"], "refused");
+        assert!(!vault.connect_abandon(99).unwrap());
+    }
+
+    #[test]
+    fn a_connect_begun_through_the_vault_is_finished_once_and_persists_the_row() {
+        let vault = Medium::default().vault(&key("11"), None);
+        vault
+            .set("google", "CLIENT_ID", "client-id-1", None, None)
+            .unwrap();
+        let grant = json!({
+            "name": "DRIVE", "principal": "u1", "tokenEndpoint": "https://auth.example/token",
+            "grant": "authorization_code", "code": "one-time", "redirectUri": "https://app.example/cb",
+            "clientId": "CLIENT_ID", "clientAuth": "body", "scopes": []
+        });
+        let begun: Value =
+            serde_json::from_str(&vault.connect_begin(&grant.to_string()).unwrap()).unwrap();
+        assert_eq!(begun["ok"]["endpoint"], "https://auth.example/token");
+        let ticket = begun["ok"]["ticket"].as_u64().unwrap();
+        assert_eq!(
+            vault.resolve("DRIVE", Some("u1")).unwrap(),
+            None,
+            "begin persists nothing"
+        );
+        let good = r#"{"access_token":"ACCESS-1","token_type":"Bearer","expires_in":3600}"#;
+        let done: Value =
+            serde_json::from_str(&vault.connect_finish(ticket, 200, good).unwrap()).unwrap();
+        assert_eq!(done["ok"]["connected"], true);
+        assert_eq!(
+            vault.resolve("DRIVE", Some("u1")).unwrap().as_deref(),
+            Some("ACCESS-1")
+        );
+        let again: Value =
+            serde_json::from_str(&vault.connect_finish(ticket, 200, good).unwrap()).unwrap();
+        assert_eq!(again["error"]["kind"], "refused");
     }
 
     #[test]
@@ -316,7 +466,10 @@ mod tests {
         );
         let listing: Value = serde_json::from_str(&vault.listing().unwrap()).unwrap();
         assert_eq!(listing["entries"][0]["service"], "google");
-        assert_eq!(listing["entries"][0]["last4"], "0002", "a secret of eight characters shows its last four");
+        assert_eq!(
+            listing["entries"][0]["last4"], "0002",
+            "a secret of eight characters shows its last four"
+        );
         vault
             .persist("SESSION", "s-1111", None, Some("ada@example.com"))
             .unwrap();

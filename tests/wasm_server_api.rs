@@ -192,6 +192,17 @@ fn os_allows_answers_the_programs_grants_and_a_control_is_refused() {
 }
 
 #[test]
+fn egress_allows_answers_the_programs_declared_origins_and_a_control_is_refused() {
+    let mut program = schema();
+    program["egress"] = json!(["https://auth.example.com"]);
+    let api = ServerApi::new(&program.to_string()).unwrap();
+    assert!(api.egress_allows("https://auth.example.com/token"));
+    assert!(!api.egress_allows("https://evil.example.com/token"));
+    assert!(!api.egress_allows("http://auth.example.com/token"));
+    assert!(!ServerApi::new(&schema().to_string()).unwrap().egress_allows("https://auth.example.com/token"));
+}
+
+#[test]
 fn a_browser_host_matches_tab_urls_with_the_kernels_one_rule() {
     use orbital_core::embed::tab_url_matches;
     assert!(tab_url_matches("https://*.example.com/*", "https://www.example.com/a?b=1"));

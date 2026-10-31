@@ -357,6 +357,11 @@ impl Server {
         self.api.os_allows(requirement_json).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = egressAllows)]
+    pub fn egress_allows(&self, url: &str) -> bool {
+        self.api.egress_allows(url)
+    }
+
     #[wasm_bindgen(js_name = setOsAnchors)]
     pub fn set_os_anchors(&self, anchors_json: &str) -> Result<String, JsError> {
         self.api.set_os_anchors(anchors_json).map_err(js)
@@ -646,6 +651,26 @@ impl CredentialVault {
 
     pub fn rotate(&self) -> Result<String, JsError> {
         self.api.rotate().map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = connectBegin)]
+    pub fn connect_begin(&self, grant_json: &str) -> Result<String, JsError> {
+        self.api.connect_begin(grant_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = refreshBegin)]
+    pub fn refresh_begin(&self, name: &str, principal: Option<String>) -> Result<String, JsError> {
+        self.api.refresh_begin(name, principal.as_deref()).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = connectFinish)]
+    pub fn connect_finish(&self, ticket: f64, status: u16, body: &str) -> Result<String, JsError> {
+        self.api.connect_finish(ticket as u64, status, body).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = connectAbandon)]
+    pub fn connect_abandon(&self, ticket: f64) -> Result<bool, JsError> {
+        self.api.connect_abandon(ticket as u64).map_err(js)
     }
 
     #[wasm_bindgen(js_name = takeWrites)]
