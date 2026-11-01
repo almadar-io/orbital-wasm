@@ -752,6 +752,28 @@ pub fn event_wires(schema_json: &str) -> Result<String, String> {
     to_json(&orbital_core::event_wires::event_wires(&schema))
 }
 
+#[derive(serde::Deserialize)]
+struct PackWire {
+    package: String,
+    definition: orbital_core::i18n::tables::I18nDefinition,
+}
+
+/// The kernel's verdict on a set of language packs (`[{ package, definition }]` as JSON): `Ok` when every pack loads, else the
+/// refusal `validate_packs` states, naming each pack, section and word.
+pub fn validate_packs(packs_json: &str) -> Result<(), String> {
+    let wires: Vec<PackWire> = parse(packs_json, "packs_json")?;
+    let packs: Vec<orbital_core::i18n::packs::VocabularyPack> = wires
+        .into_iter()
+        .map(|w| orbital_core::i18n::packs::VocabularyPack {
+            package: w.package,
+            version: String::new(),
+            compiler: String::new(),
+            definition: w.definition,
+        })
+        .collect();
+    orbital_core::i18n::packs::validate_packs(&packs).map_err(|e| e.to_string())
+}
+
 pub fn tab_url_matches(pattern: &str, url: &str) -> bool {
     orbital_core::embed::tab_url_matches(pattern, url)
 }

@@ -688,6 +688,12 @@ pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<JsV
     js_sys::JSON::parse(&request).map_err(|_| JsError::new("parseEventRequest: the kernel wrote no JSON"))
 }
 
+/// The kernel's verdict on language packs (`[{ package, definition }]` as JSON): throws the refusal that names each pack, section and word.
+#[wasm_bindgen(js_name = validatePacks)]
+pub fn validate_packs(packs_json: &str) -> Result<(), JsError> {
+    api::validate_packs(packs_json).map_err(js)
+}
+
 /// The program's emitter-to-listener wire table (`EventWire[]` as JSON), by the source rule the kernel delivers by.
 #[wasm_bindgen(js_name = eventWires)]
 pub fn event_wires(schema_json: &str) -> Result<String, JsError> {

@@ -700,6 +700,40 @@ fn event_wires_lists_the_deliveries_between_traits() {
     );
 }
 
+fn http_pack(keyword: &str, effect: Option<&str>) -> String {
+    let effects = effect.map_or(json!({}), |e| json!({ "http": e }));
+    json!([{
+        "package": "lolo-qi",
+        "definition": {
+            "meta": { "code": "qi", "name": "qi", "rtl": false },
+            "keywords": { "orbital": "qi-orbital", "http": keyword },
+            "effects": effects,
+            "orb": { "orbitals": "qi-orbitals" }
+        }
+    }])
+    .to_string()
+}
+
+#[test]
+fn validate_packs_refuses_one_word_spelled_two_ways_naming_pack_section_word() {
+    let err = orbital_wasm::api::validate_packs(&http_pack("qi-http-a", Some("qi-http-b"))).unwrap_err();
+    assert!(
+        err.contains("lolo-qi") && err.contains("Inconsistent effects.http") && err.contains("qi-http-a") && err.contains("qi-http-b"),
+        "{err}"
+    );
+}
+
+#[test]
+fn validate_packs_control_consistent_and_single_section_packs_load() {
+    assert_eq!(orbital_wasm::api::validate_packs(&http_pack("qi-http", Some("qi-http"))), Ok(()));
+    assert_eq!(orbital_wasm::api::validate_packs(&http_pack("qi-http", None)), Ok(()));
+}
+
+#[test]
+fn validate_packs_edge_malformed_json_is_an_error_not_a_pass() {
+    assert!(orbital_wasm::api::validate_packs("{").is_err());
+}
+
 fn self_listening_schema() -> String {
     json!({
         "name": "App", "typeContractVersion": 1,
