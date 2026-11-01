@@ -348,8 +348,8 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = osAllows)]
-    pub fn os_allows(&self, requirement_json: &str) -> Result<bool, JsError> {
-        self.api.os_allows(requirement_json).map_err(js)
+    pub fn os_allows(&self, requirement_json: &str, orbital: Option<String>) -> Result<bool, JsError> {
+        self.api.os_allows(requirement_json, orbital.as_deref()).map_err(js)
     }
 
     #[wasm_bindgen(js_name = egressAllows)]

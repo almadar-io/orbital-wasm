@@ -177,7 +177,7 @@ fn os_allows_answers_the_programs_grants_and_a_control_is_refused() {
     let mut program = schema();
     program["osGrants"] = json!({ "exec": ["git"], "fs": [{ "glob": "/data/**", "modes": ["read"] }] });
     let api = ServerApi::new(&program.to_string()).unwrap();
-    let allows = |need: Value| api.os_allows(&need.to_string());
+    let allows = |need: Value| api.os_allows(&need.to_string(), None);
     assert_eq!(allows(json!({"need":"exec","command":"git"})), Ok(true));
     assert_eq!(allows(json!({"need":"exec","command":"rm"})), Ok(false));
     assert_eq!(allows(json!({"need":"fs","path":"/data/a/b","mode":"read"})), Ok(true));
@@ -186,6 +186,28 @@ fn os_allows_answers_the_programs_grants_and_a_control_is_refused() {
     assert!(allows(json!({"need":"nope"})).is_err());
     assert!(orbital_core::embed::os_glob_matches("/data/**", "/data/x/y"));
     assert!(!orbital_core::embed::os_glob_matches("/data/*", "/data/x/y"));
+}
+
+#[test]
+fn os_allows_answers_the_calling_orbitals_grants_and_a_sibling_is_refused() {
+    let mut program = schema();
+    program["orbitals"][0]["osGrants"] = json!({ "exec": ["git"] });
+    let mut sibling = program["orbitals"][0].clone();
+    sibling["name"] = json!("Other");
+    sibling["entity"]["name"] = json!("Memo");
+    sibling["traits"][0]["name"] = json!("OtherDraft");
+    sibling["traits"][0]["linkedEntity"] = json!("Memo");
+    sibling.as_object_mut().unwrap().remove("osGrants");
+    program["orbitals"].as_array_mut().unwrap().push(sibling);
+    let api = ServerApi::new(&program.to_string()).unwrap();
+    let git = json!({"need":"exec","command":"git"}).to_string();
+    assert_eq!(api.os_allows(&git, Some("Main")), Ok(true));
+    assert_eq!(api.os_allows(&git, Some("Other")), Ok(false));
+    assert_eq!(api.os_allows(&git, None), Ok(false), "no orbital named: the app level alone");
+
+    program["osGrants"] = json!({ "exec": ["git"] });
+    let app_level = ServerApi::new(&program.to_string()).unwrap();
+    assert_eq!(app_level.os_allows(&git, Some("Other")), Ok(true), "control: an app-level grant answers every orbital");
 }
 
 #[test]

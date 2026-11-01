@@ -492,9 +492,9 @@ impl ServerApi {
         &self.embedded
     }
 
-    /// Whether the program's `os/` grants cover `requirement_json` (an `OsRequirement`).
-    pub fn os_allows(&self, requirement_json: &str) -> Result<bool, String> {
-        self.record(self.embedded.os_allows_json(requirement_json))
+    /// Whether the `os/` grants of `orbital` (the app level alone when none is named) cover `requirement_json` (an `OsRequirement`).
+    pub fn os_allows(&self, requirement_json: &str, orbital: Option<&str>) -> Result<bool, String> {
+        self.record(self.embedded.os_allows_json(requirement_json, orbital))
     }
 
     /// Whether `url`'s origin is declared in the program's `egress`.
