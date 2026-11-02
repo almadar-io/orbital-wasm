@@ -37,6 +37,7 @@ jobs:
         working-directory: js
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-          npm publish --access public
+          # Published under the next dist-tag; the orb release smoke (orbital-rust release-smoke.yml) promotes it to latest.
+          npm publish --access public --tag next
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
