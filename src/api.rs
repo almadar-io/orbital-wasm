@@ -305,6 +305,12 @@ impl KernelApi {
         self.embedded.tick_count()
     }
 
+    /// The theme key the server bound to this client's session with `theme/set`, mirrored from its frames; `None` when
+    /// none is bound and the declared themes apply (G-CROSS-395).
+    pub fn session_theme(&self) -> Option<String> {
+        self.embedded.kernel().session_theme().map(|key| key.to_string())
+    }
+
     pub fn trait_config(&self, trait_name: &str) -> Result<String, String> {
         self.record((|| to_json(&self.embedded.trait_config(trait_name)?))())
     }

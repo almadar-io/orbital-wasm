@@ -194,6 +194,12 @@ impl Kernel {
         u32::try_from(self.api.tick_count()).unwrap_or(u32::MAX)
     }
 
+    /// The theme key bound to this client's session (`theme/set`, mirrored from the server's frames), or `undefined`.
+    #[wasm_bindgen(js_name = sessionTheme)]
+    pub fn session_theme(&self) -> Option<String> {
+        self.api.session_theme()
+    }
+
     /// The config the kernel binds as `@config` for a registered trait, as JSON text.
     #[wasm_bindgen(js_name = traitConfig)]
     pub fn trait_config(&self, trait_name: &str) -> Result<String, JsError> {
