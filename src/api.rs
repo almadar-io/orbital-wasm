@@ -40,7 +40,7 @@ pub struct KernelApi {
 }
 
 fn to_json<T: Serialize>(value: &T) -> Result<String, String> {
-    serde_json::to_string(value).map_err(|e| format!("serialize: {e}"))
+    orbital_core::js_readable::to_js_readable_json(value)
 }
 
 fn parse<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> Result<T, String> {
