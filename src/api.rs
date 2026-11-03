@@ -773,7 +773,7 @@ pub fn validate_packs(packs_json: &str) -> Result<(), String> {
         .map(|w| orbital_core::i18n::packs::VocabularyPack {
             package: w.package,
             version: String::new(),
-            compiler: String::new(),
+            language: String::new(),
             definition: w.definition,
         })
         .collect();
