@@ -10,7 +10,7 @@
 
 </div>
 
-<p align="center"><sub>Part of <a href="https://github.com/almadar-io/orb"><b>Orb</b></a>: the language where the rule is the program. <a href="https://orb.almadar.io">orb.almadar.io</a></sub></p>
+<p align="center"><sub>Part of <a href="https://github.com/almadar-io/orb"><b>Orb</b></a>: a programming language of composable state machines. <a href="https://orb.almadar.io">orb.almadar.io</a></sub></p>
 
 `wasm-bindgen` marshalling over `orbital_core::embed`. It exposes `Kernel` (the client role) and `Server` (the server role, whose I/O the host answers), both speaking the kernel's JSON wire. A failed operation throws a JS `Error`. The same kernel runs natively through [orbital-ffi](https://github.com/almadar-io/orbital-ffi) on iOS and Android.
 
