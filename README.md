@@ -133,9 +133,7 @@ cd js && sh scripts/build.sh && npm test
 
 ## Docs
 
-- [Orbital Core](https://github.com/itechdom/kflow.ai/blob/main/docs/Almadar_Orbital_Core.md)
-- [Orbital Shell TypeScript](https://github.com/itechdom/kflow.ai/blob/main/docs/Almadar_Orbital_Shell_TypeScript.md)
-- [Execution Semantics](https://github.com/itechdom/kflow.ai/blob/main/docs/Almadar_Execution_Semantics.md)
+- [Orb documentation](https://orb.almadar.io/docs): the language, the `orb` CLI and how the pieces fit
 
 ## License
 
