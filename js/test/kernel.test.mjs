@@ -127,11 +127,12 @@ test('evaluateMany binds a render in one crossing; a failing expression is its o
 });
 
 test('evaluateGuards takes booleans only: a list or number is a type error, never read by truthiness (EXEC-EVAL-7)', () => {
-  const verdicts = JSON.parse(evaluateGuards(JSON.stringify({ entity: { tags: [], n: 2 } }), JSON.stringify(['@entity.tags', '@entity.n', ['>', '@entity.n', 5], ['>', '@entity.n', 1]])));
-  assert.deepEqual(verdicts.map((v) => v.kind), ['error', 'error', 'value', 'value']);
+  const verdicts = JSON.parse(evaluateGuards(JSON.stringify({ entity: { tags: [], n: 2, x: 2.5 } }), JSON.stringify(['@entity.tags', '@entity.n', '@entity.x', ['>', '@entity.n', 5], ['>', '@entity.n', 1]])));
+  assert.deepEqual(verdicts.map((v) => v.kind), ['error', 'error', 'error', 'value', 'value']);
   assert.match(verdicts[0].message, /expected boolean, got array/);
-  assert.match(verdicts[1].message, /expected boolean, got number/);
-  assert.deepEqual(verdicts.slice(2).map((v) => v.value), [false, true]);
+  assert.match(verdicts[1].message, /expected boolean, got int/);
+  assert.match(verdicts[2].message, /expected boolean, got number/);
+  assert.deepEqual(verdicts.slice(3).map((v) => v.value), [false, true]);
 });
 
 test('evaluateTraced records the short-circuited argument as skipped', () => {

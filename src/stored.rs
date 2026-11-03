@@ -48,7 +48,7 @@ fn is_row_request(request: &IoRequestWire) -> bool {
 }
 
 fn json<T: serde::Serialize>(value: &T) -> Result<String, String> {
-    serde_json::to_string(value).map_err(|e| format!("serialize: {e}"))
+    orbital_core::js_readable::to_js_readable_json(value)
 }
 
 impl StoredServer {
