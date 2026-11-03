@@ -142,6 +142,43 @@ fn an_empty_schema_is_refused() {
 }
 
 #[test]
+fn skinning_bridge_projects_rig_and_affine_json_without_host_math() {
+    use orbital_wasm::api::{
+        skin_apply_affine, skin_compose_affine, skin_invert_affine, skin_triangle_affine,
+        skin_vertex_bounds, skin_vertices, skin_world_matrices,
+    };
+
+    let bones = json!([
+        {"name":"root","parent":null,"pivot":[0,0],"tip":[1,0]},
+        {"name":"child","parent":"root","pivot":[1,0],"tip":[2,0]}
+    ]);
+    let bind = skin_world_matrices(&bones.to_string(), "{}").unwrap();
+    let posed = skin_world_matrices(&bones.to_string(), r#"{"root":90}"#).unwrap();
+    let mesh = json!({"vertices":[{"x":2,"y":0,"u":0,"v":0,
+        "weights":[{"bone":1,"w":1}]}],"triangles":[]});
+    let points = parsed(&skin_vertices(&mesh.to_string(), &bind, &posed).unwrap());
+    assert!((points[0][0].as_f64().unwrap()).abs() < 1e-12);
+    assert!((points[0][1].as_f64().unwrap() - 2.0).abs() < 1e-12);
+
+    let world = parsed(&posed);
+    let child = world[1].to_string();
+    let inverse = skin_invert_affine(&child).unwrap();
+    let identity = skin_compose_affine(&child, &inverse).unwrap();
+    let point = parsed(&skin_apply_affine(&identity, 7.0, -3.0).unwrap());
+    assert!((point[0].as_f64().unwrap() - 7.0).abs() < 1e-12);
+    assert!((point[1].as_f64().unwrap() + 3.0).abs() < 1e-12);
+
+    let triangle =
+        parsed(&skin_triangle_affine("[[0,0],[1,0],[0,1]]", "[[2,3],[4,3],[2,5]]").unwrap());
+    assert_eq!(triangle, json!([2.0, 0.0, 0.0, 2.0, 2.0, 3.0]));
+    let bounds = parsed(&skin_vertex_bounds("[[1,2],[-3,4],[0,-1]]").unwrap());
+    assert_eq!(
+        bounds,
+        json!({"minX":-3.0,"minY":-1.0,"maxX":1.0,"maxY":4.0})
+    );
+}
+
+#[test]
 fn a_host_with_no_program_asks_the_kernel_for_the_empty_answers() {
     let ask = |q: &str| contract_query_without_program(q);
     assert!(pj(&ask(
@@ -1152,4 +1189,46 @@ fn avl_trait_flow_api_groups_source_behaviors() {
     assert_eq!(flow["units"].as_array().unwrap().len(), 1);
     assert_eq!(flow["units"][0]["traits"], json!(["One", "Two"]));
     assert_eq!(flow["units"][0]["column"], json!("std"));
+}
+
+#[test]
+fn avl_program_trait_levels_api_uses_core_machine_projection() {
+    let schema = json!({
+        "name": "app", "typeContractVersion": 1,
+        "orbitals": [{ "name": "Main", "entity": { "name": "Door", "fields": [] },
+          "traits": [{ "name": "DoorLife", "linkedEntity": "Door",
+            "sourceBehavior": { "behavior": "std/atoms/door", "alias": "Door", "originalName": "Life" },
+            "stateMachine": { "states": [{ "name": "closed" }, { "name": "open" }],
+              "transitions": [{ "from": "closed", "to": "open", "event": "OPEN" }] }
+          }]
+        }]
+    });
+    let levels = reported(orbital_wasm::api::avl_program_trait_levels(
+        &schema.to_string(),
+    ));
+    assert_eq!(levels[0]["orbital"], "Main");
+    assert_eq!(levels[0]["trait"]["sourceBehavior"]["originalName"], "Life");
+    assert_eq!(levels[0]["level"]["linkedEntity"], "Door");
+    assert_eq!(levels[0]["level"]["transitions"][0]["event"], "OPEN");
+}
+
+#[test]
+fn avl_described_transition_lines_api_uses_core_arm_mapping() {
+    let machine = json!({"states":[{"name":"idle"},{"name":"ready"}],"transitions":[
+        {"from":"idle","to":"ready","event":"GO"},
+        {"from":"idle","to":"ready","event":"GO"}
+    ]});
+    let description = json!({
+        "value":{"trait":"Task"}, "events":{"emits":[],"listens":[]},
+        "machine":{"stateMachine":machine},
+        "source":{"text":"trait Task","transitions":[
+            {"index":0,"start":4,"end":6},{"index":1,"start":7,"end":9}
+        ]}
+    });
+    let lines = reported(orbital_wasm::api::avl_described_transition_lines(
+        &description.to_string(),
+        &machine.to_string(),
+        1,
+    ));
+    assert_eq!(lines, json!({"start":7,"end":9}));
 }

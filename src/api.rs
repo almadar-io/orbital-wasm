@@ -924,6 +924,83 @@ pub fn avl_trait_flow_graph(
     ))
 }
 
+pub fn avl_program_trait_levels(schema_json: &str) -> Result<String, String> {
+    let schema: OrbitalSchema = parse(schema_json, "schema_json")?;
+    let projected = orbital_core::schema::avl_projection::program_trait_levels(&schema)?;
+    to_json(&projected)
+}
+
+pub fn avl_described_transition_lines(
+    description_json: &str,
+    running_json: &str,
+    transition_index: usize,
+) -> Result<String, String> {
+    let description: orbital_core::schema::avl_projection::AvlTraitDescription =
+        parse(description_json, "description_json")?;
+    let running: orbital_core::schema::StateMachine = parse(running_json, "running_json")?;
+    to_json(
+        &orbital_core::schema::avl_projection::described_transition_lines(
+            &description,
+            &running,
+            transition_index,
+        ),
+    )
+}
+
+pub fn skin_world_matrices(bones_json: &str, pose_json: &str) -> Result<String, String> {
+    let bones = parse::<Vec<orbital_core::skinning_2d::BoneDef>>(bones_json, "bones_json")?;
+    let pose = parse::<orbital_core::skinning_2d::Pose>(pose_json, "pose_json")?;
+    to_json(&orbital_core::skinning_2d::compute_world_matrices(
+        &bones, &pose,
+    ))
+}
+
+pub fn skin_vertices(
+    mesh_json: &str,
+    bind_json: &str,
+    current_json: &str,
+) -> Result<String, String> {
+    let mesh = parse::<orbital_core::skinning_2d::SkinMesh>(mesh_json, "mesh_json")?;
+    let bind = parse::<Vec<orbital_core::skinning_2d::Affine2D>>(bind_json, "bind_json")?;
+    let current = parse::<Vec<orbital_core::skinning_2d::Affine2D>>(current_json, "current_json")?;
+    to_json(&orbital_core::skinning_2d::skin_vertices(
+        &mesh, &bind, &current,
+    ))
+}
+
+pub fn skin_compose_affine(a_json: &str, b_json: &str) -> Result<String, String> {
+    let a = parse::<orbital_core::skinning_2d::Affine2D>(a_json, "a_json")?;
+    let b = parse::<orbital_core::skinning_2d::Affine2D>(b_json, "b_json")?;
+    to_json(&orbital_core::skinning_2d::compose_affine(a, b))
+}
+
+pub fn skin_invert_affine(matrix_json: &str) -> Result<String, String> {
+    let matrix = parse::<orbital_core::skinning_2d::Affine2D>(matrix_json, "matrix_json")?;
+    to_json(&orbital_core::skinning_2d::invert_affine(matrix))
+}
+
+pub fn skin_apply_affine(matrix_json: &str, x: f64, y: f64) -> Result<String, String> {
+    let matrix = parse::<orbital_core::skinning_2d::Affine2D>(matrix_json, "matrix_json")?;
+    to_json(&orbital_core::skinning_2d::apply_affine(matrix, x, y))
+}
+
+pub fn skin_triangle_affine(src_json: &str, dst_json: &str) -> Result<String, String> {
+    let src = parse::<[[f64; 2]; 3]>(src_json, "src_json")?;
+    let dst = parse::<[[f64; 2]; 3]>(dst_json, "dst_json")?;
+    to_json(&orbital_core::skinning_2d::triangle_affine(src, dst))
+}
+
+pub fn skin_vertex_bounds(points_json: &str) -> Result<String, String> {
+    let points = parse::<Vec<[f64; 2]>>(points_json, "points_json")?;
+    let bounds =
+        orbital_core::skinning_2d::vertex_bounds(&points).map(|[min_x, min_y, max_x, max_y]| {
+            serde_json::json!({
+                "minX": min_x, "minY": min_y, "maxX": max_x, "maxY": max_y
+            })
+        });
+    to_json(&bounds)
+}
+
 #[derive(serde::Deserialize)]
 struct PackWire {
     package: String,

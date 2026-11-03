@@ -887,6 +887,60 @@ pub fn avl_trait_flow_graph(
     api::avl_trait_flow_graph(schema_json, orbital, layers_json).map_err(js)
 }
 
+#[wasm_bindgen(js_name = avlProgramTraitLevels)]
+pub fn avl_program_trait_levels(schema_json: &str) -> Result<String, JsError> {
+    api::avl_program_trait_levels(schema_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlDescribedTransitionLines)]
+pub fn avl_described_transition_lines(
+    description_json: &str,
+    running_json: &str,
+    transition_index: usize,
+) -> Result<String, JsError> {
+    api::avl_described_transition_lines(description_json, running_json, transition_index)
+        .map_err(js)
+}
+
+#[wasm_bindgen(js_name = skinWorldMatrices)]
+pub fn skin_world_matrices(bones_json: &str, pose_json: &str) -> Result<String, JsError> {
+    api::skin_world_matrices(bones_json, pose_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = skinVertices)]
+pub fn skin_vertices(
+    mesh_json: &str,
+    bind_json: &str,
+    current_json: &str,
+) -> Result<String, JsError> {
+    api::skin_vertices(mesh_json, bind_json, current_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = skinComposeAffine)]
+pub fn skin_compose_affine(a_json: &str, b_json: &str) -> Result<String, JsError> {
+    api::skin_compose_affine(a_json, b_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = skinInvertAffine)]
+pub fn skin_invert_affine(matrix_json: &str) -> Result<String, JsError> {
+    api::skin_invert_affine(matrix_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = skinApplyAffine)]
+pub fn skin_apply_affine(matrix_json: &str, x: f64, y: f64) -> Result<String, JsError> {
+    api::skin_apply_affine(matrix_json, x, y).map_err(js)
+}
+
+#[wasm_bindgen(js_name = skinTriangleAffine)]
+pub fn skin_triangle_affine(src_json: &str, dst_json: &str) -> Result<String, JsError> {
+    api::skin_triangle_affine(src_json, dst_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = skinVertexBounds)]
+pub fn skin_vertex_bounds(points_json: &str) -> Result<String, JsError> {
+    api::skin_vertex_bounds(points_json).map_err(js)
+}
+
 /// The typed event request a `program/dispatch` call names, as an object; a record that is no event request throws the reason.
 #[wasm_bindgen(js_name = parseEventRequest)]
 pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<JsValue, JsError> {
