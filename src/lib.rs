@@ -88,18 +88,31 @@ impl Kernel {
         base_json: Option<String>,
     ) -> Result<String, JsError> {
         self.api
-            .fold_in_order(flight as u64, response_json, already_delivered_json.as_deref(), base_json.as_deref())
+            .fold_in_order(
+                flight as u64,
+                response_json,
+                already_delivered_json.as_deref(),
+                base_json.as_deref(),
+            )
             .map_err(js)
     }
 
     #[wasm_bindgen(js_name = deliverEmitToListeners)]
-    pub fn deliver_emit_to_listeners(&self, flight: f64, emitted_json: &str) -> Result<String, JsError> {
-        self.api.deliver_emit_to_listeners(flight as u64, emitted_json).map_err(js)
+    pub fn deliver_emit_to_listeners(
+        &self,
+        flight: f64,
+        emitted_json: &str,
+    ) -> Result<String, JsError> {
+        self.api
+            .deliver_emit_to_listeners(flight as u64, emitted_json)
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = deliverOriginEmit)]
     pub fn deliver_origin_emit(&self, flight: f64, emitted_json: &str) -> Result<String, JsError> {
-        self.api.deliver_origin_emit(flight as u64, emitted_json).map_err(js)
+        self.api
+            .deliver_origin_emit(flight as u64, emitted_json)
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = nextFold)]
@@ -123,8 +136,14 @@ impl Kernel {
     }
 
     #[wasm_bindgen(js_name = reseedLeg)]
-    pub fn reseed_leg(&self, seeds_json: &str, entity_id: Option<String>) -> Result<String, JsError> {
-        self.api.reseed_leg(seeds_json, entity_id.as_deref()).map_err(js)
+    pub fn reseed_leg(
+        &self,
+        seeds_json: &str,
+        entity_id: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .reseed_leg(seeds_json, entity_id.as_deref())
+            .map_err(js)
     }
 
     /// `undefined` when the leg carried no rows to fold against.
@@ -259,8 +278,15 @@ impl Kernel {
         self.api.remount(traits_json).map_err(js)
     }
 
-    pub fn enter(&self, route_path: Option<String>, mount_key: &str, traits_json: &str) -> Result<String, JsError> {
-        self.api.enter(route_path.as_deref(), mount_key, traits_json).map_err(js)
+    pub fn enter(
+        &self,
+        route_path: Option<String>,
+        mount_key: &str,
+        traits_json: &str,
+    ) -> Result<String, JsError> {
+        self.api
+            .enter(route_path.as_deref(), mount_key, traits_json)
+            .map_err(js)
     }
 
     pub fn leave(&self) -> Result<String, JsError> {
@@ -269,7 +295,9 @@ impl Kernel {
 
     #[wasm_bindgen(js_name = setMessages)]
     pub fn set_messages(&self, locales_json: &str, catalogs_json: &str) -> Result<(), JsError> {
-        self.api.set_messages(locales_json, catalogs_json).map_err(js)
+        self.api
+            .set_messages(locales_json, catalogs_json)
+            .map_err(js)
     }
 
     pub fn mount(&self, traits_json: &str) -> Result<(), JsError> {
@@ -287,8 +315,14 @@ impl Kernel {
     }
 
     #[wasm_bindgen(js_name = pageCircuit)]
-    pub fn page_circuit(&self, page: Option<String>, route: Option<String>) -> Result<String, JsError> {
-        self.api.page_circuit(page.as_deref(), route.as_deref()).map_err(js)
+    pub fn page_circuit(
+        &self,
+        page: Option<String>,
+        route: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .page_circuit(page.as_deref(), route.as_deref())
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = contractQuery)]
@@ -354,8 +388,14 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = osAllows)]
-    pub fn os_allows(&self, requirement_json: &str, orbital: Option<String>) -> Result<bool, JsError> {
-        self.api.os_allows(requirement_json, orbital.as_deref()).map_err(js)
+    pub fn os_allows(
+        &self,
+        requirement_json: &str,
+        orbital: Option<String>,
+    ) -> Result<bool, JsError> {
+        self.api
+            .os_allows(requirement_json, orbital.as_deref())
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = egressAllows)]
@@ -412,8 +452,14 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = liveItemDelivered)]
-    pub fn live_item_delivered(&self, item_json: &str, client_id: Option<String>) -> Result<bool, JsError> {
-        self.api.live_item_delivered(item_json, client_id.as_deref()).map_err(js)
+    pub fn live_item_delivered(
+        &self,
+        item_json: &str,
+        client_id: Option<String>,
+    ) -> Result<bool, JsError> {
+        self.api
+            .live_item_delivered(item_json, client_id.as_deref())
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = dispatchStream)]
@@ -422,8 +468,14 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = resolveRows)]
-    pub fn resolve_rows(&self, ref_json: &str, client_id: Option<String>) -> Result<String, JsError> {
-        self.api.resolve_rows(ref_json, client_id.as_deref()).map_err(js)
+    pub fn resolve_rows(
+        &self,
+        ref_json: &str,
+        client_id: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .resolve_rows(ref_json, client_id.as_deref())
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = resumeResolve)]
@@ -458,8 +510,14 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = pageCircuit)]
-    pub fn page_circuit(&self, page: Option<String>, route: Option<String>) -> Result<String, JsError> {
-        self.api.page_circuit(page.as_deref(), route.as_deref()).map_err(js)
+    pub fn page_circuit(
+        &self,
+        page: Option<String>,
+        route: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .page_circuit(page.as_deref(), route.as_deref())
+            .map_err(js)
     }
 
     /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
@@ -501,13 +559,27 @@ impl Server {
     }
 
     #[wasm_bindgen(js_name = mountClient)]
-    pub fn mount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), JsError> {
-        self.api.mount_client(client, orbital, traits_json).map_err(js)
+    pub fn mount_client(
+        &self,
+        client: &str,
+        orbital: &str,
+        traits_json: &str,
+    ) -> Result<(), JsError> {
+        self.api
+            .mount_client(client, orbital, traits_json)
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = unmountClient)]
-    pub fn unmount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), JsError> {
-        self.api.unmount_client(client, orbital, traits_json).map_err(js)
+    pub fn unmount_client(
+        &self,
+        client: &str,
+        orbital: &str,
+        traits_json: &str,
+    ) -> Result<(), JsError> {
+        self.api
+            .unmount_client(client, orbital, traits_json)
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = releaseClient)]
@@ -522,7 +594,8 @@ impl Server {
 
     #[wasm_bindgen(js_name = setTickRelayInterval)]
     pub fn set_tick_relay_interval(&self, interval_ms: f64) {
-        self.api.set_tick_relay_interval(interval_ms.max(0.0) as u64);
+        self.api
+            .set_tick_relay_interval(interval_ms.max(0.0) as u64);
     }
 
     #[wasm_bindgen(js_name = flushTickRelay)]
@@ -576,7 +649,10 @@ pub struct CredentialVault {
 #[wasm_bindgen]
 impl CredentialVault {
     #[wasm_bindgen(constructor)]
-    pub fn new(master_key: Option<String>, previous_key: Option<String>) -> Result<CredentialVault, JsError> {
+    pub fn new(
+        master_key: Option<String>,
+        previous_key: Option<String>,
+    ) -> Result<CredentialVault, JsError> {
         credentials::VaultApi::new(master_key.as_deref(), previous_key.as_deref())
             .map(|api| CredentialVault { api })
             .map_err(js)
@@ -588,10 +664,17 @@ impl CredentialVault {
     }
 
     pub fn load(&self, rows_json: &str) -> Result<u32, JsError> {
-        self.api.load(rows_json).map(|count| count as u32).map_err(js)
+        self.api
+            .load(rows_json)
+            .map(|count| count as u32)
+            .map_err(js)
     }
 
-    pub fn resolve(&self, name: &str, principal: Option<String>) -> Result<Option<String>, JsError> {
+    pub fn resolve(
+        &self,
+        name: &str,
+        principal: Option<String>,
+    ) -> Result<Option<String>, JsError> {
         self.api.resolve(name, principal.as_deref()).map_err(js)
     }
 
@@ -625,8 +708,15 @@ impl CredentialVault {
             .map_err(js)
     }
 
-    pub fn replace(&self, name: &str, value: &str, principal: Option<String>) -> Result<String, JsError> {
-        self.api.replace(name, value, principal.as_deref()).map_err(js)
+    pub fn replace(
+        &self,
+        name: &str,
+        value: &str,
+        principal: Option<String>,
+    ) -> Result<String, JsError> {
+        self.api
+            .replace(name, value, principal.as_deref())
+            .map_err(js)
     }
 
     pub fn persist(
@@ -656,12 +746,16 @@ impl CredentialVault {
 
     #[wasm_bindgen(js_name = refreshBegin)]
     pub fn refresh_begin(&self, name: &str, principal: Option<String>) -> Result<String, JsError> {
-        self.api.refresh_begin(name, principal.as_deref()).map_err(js)
+        self.api
+            .refresh_begin(name, principal.as_deref())
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = connectFinish)]
     pub fn connect_finish(&self, ticket: f64, status: u16, body: &str) -> Result<String, JsError> {
-        self.api.connect_finish(ticket as u64, status, body).map_err(js)
+        self.api
+            .connect_finish(ticket as u64, status, body)
+            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = connectAbandon)]
@@ -687,11 +781,118 @@ pub fn os_glob_matches(glob: &str, path: &str) -> bool {
     api::os_glob_matches(glob, path)
 }
 
+#[wasm_bindgen(js_name = expandFxLayer)]
+pub fn expand_fx_layer(
+    layer_json: &str,
+    epoch_now_ms: f64,
+    dimension: &str,
+    tile_width: Option<f64>,
+    font_family: Option<String>,
+) -> Result<String, JsError> {
+    api::expand_fx_layer(
+        layer_json,
+        epoch_now_ms,
+        dimension,
+        tile_width,
+        font_family.as_deref(),
+    )
+    .map_err(js)
+}
+
+#[wasm_bindgen(js_name = resolveFxView)]
+pub fn resolve_fx_view(item_json: &str, presets_json: Option<String>) -> Result<String, JsError> {
+    api::resolve_fx_view(item_json, presets_json.as_deref()).map_err(js)
+}
+
+#[wasm_bindgen(js_name = fxLifecycle)]
+pub fn fx_lifecycle(view_json: &str, epoch_now_ms: f64, tick_ms: f64) -> Result<String, JsError> {
+    api::fx_lifecycle(view_json, epoch_now_ms, tick_ms).map_err(js)
+}
+
+#[wasm_bindgen(js_name = fxHash01)]
+pub fn fx_hash01(seed: &str, salt: u32) -> f64 {
+    api::fx_hash01(seed, salt)
+}
+
+#[wasm_bindgen(js_name = avlTransitionPlayback)]
+pub fn avl_transition_playback(
+    machine_json: &str,
+    transition_index: u32,
+    orbital: &str,
+    trait_name: &str,
+    scene_json: &str,
+    cursor: i32,
+) -> Result<String, JsError> {
+    api::avl_transition_playback(
+        machine_json,
+        transition_index as usize,
+        orbital,
+        trait_name,
+        scene_json,
+        cursor,
+    )
+    .map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlTracePlayback)]
+pub fn avl_trace_playback(
+    machine_json: &str,
+    trait_name: &str,
+    traces_json: &str,
+) -> Result<String, JsError> {
+    api::avl_trace_playback(machine_json, trait_name, traces_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlStateMachinePlayback)]
+pub fn avl_state_machine_playback(
+    machine_json: &str,
+    orbital: &str,
+    trait_name: &str,
+    scene_json: &str,
+    cursor: i32,
+) -> Result<String, JsError> {
+    api::avl_state_machine_playback(machine_json, orbital, trait_name, scene_json, cursor)
+        .map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlArmIndexes)]
+pub fn avl_arm_indexes(machine_json: &str, from: &str, event: &str) -> Result<String, JsError> {
+    api::avl_arm_indexes(machine_json, from, event).map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlFiredTransitionIndex)]
+pub fn avl_fired_transition_index(machine_json: &str, step_json: &str) -> Result<String, JsError> {
+    api::avl_fired_transition_index(machine_json, step_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlTracedTransitionIndex)]
+pub fn avl_traced_transition_index(
+    machine_json: &str,
+    trace_json: &str,
+) -> Result<String, JsError> {
+    api::avl_traced_transition_index(machine_json, trace_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlTraitLevelFromDescription)]
+pub fn avl_trait_level_from_description(description_json: &str) -> Result<String, JsError> {
+    api::avl_trait_level_from_description(description_json).map_err(js)
+}
+
+#[wasm_bindgen(js_name = avlTraitFlowGraph)]
+pub fn avl_trait_flow_graph(
+    schema_json: &str,
+    orbital: &str,
+    layers_json: &str,
+) -> Result<String, JsError> {
+    api::avl_trait_flow_graph(schema_json, orbital, layers_json).map_err(js)
+}
+
 /// The typed event request a `program/dispatch` call names, as an object; a record that is no event request throws the reason.
 #[wasm_bindgen(js_name = parseEventRequest)]
 pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<JsValue, JsError> {
     let request = api::parse_event_request(payload_json, options_json).map_err(js)?;
-    js_sys::JSON::parse(&request).map_err(|_| JsError::new("parseEventRequest: the kernel wrote no JSON"))
+    js_sys::JSON::parse(&request)
+        .map_err(|_| JsError::new("parseEventRequest: the kernel wrote no JSON"))
 }
 
 /// The kernel's verdict on language packs (`[{ package, definition }]` as JSON): throws the refusal that names each pack, section and word.
@@ -732,13 +933,19 @@ pub fn os_stream_ops() -> Result<String, JsError> {
 
 /// The `{ event, payload }` a deferred keyed `os/` call's outcome (`Settled`) fires on its call site, or `null`.
 #[wasm_bindgen(js_name = osCompletionEvent)]
-pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Result<String, JsError> {
+pub fn os_completion_event(
+    site_json: &str,
+    key: &str,
+    outcome_json: &str,
+) -> Result<String, JsError> {
     api::os_completion_event(site_json, key, outcome_json).map_err(js)
 }
 
 #[wasm_bindgen(js_name = isPublicAddress)]
 pub fn is_public_address(ip: &str) -> Result<bool, JsError> {
-    ip.parse().map(orbital_core::runtime::http_wire::is_public_address).map_err(|e| js(format!("parse ip: {e}")))
+    ip.parse()
+        .map(orbital_core::runtime::http_wire::is_public_address)
+        .map_err(|e| js(format!("parse ip: {e}")))
 }
 
 /// Evaluate `expressionsJson` (`SExpr[]`) against `contextJson` (`EvalContextWire`) in one crossing:
@@ -788,7 +995,14 @@ pub fn scope_rows(
     filter_json: &str,
     entity_type: &str,
 ) -> Result<String, JsError> {
-    api::scope_rows(bindings_json, rows_json, policy_json, filter_json, entity_type).map_err(js)
+    api::scope_rows(
+        bindings_json,
+        rows_json,
+        policy_json,
+        filter_json,
+        entity_type,
+    )
+    .map_err(js)
 }
 
 /// Whether a row may be created, updated or deleted under a directive (`MutationVerdictWire` as JSON).
@@ -800,7 +1014,8 @@ pub fn check_mutation_access(
     policy_json: &str,
     entity_type: &str,
 ) -> Result<String, JsError> {
-    api::check_mutation_access(operation, bindings_json, row_json, policy_json, entity_type).map_err(js)
+    api::check_mutation_access(operation, bindings_json, row_json, policy_json, entity_type)
+        .map_err(js)
 }
 
 /// What a `@user`/`@payload`/`@config`/`@now` term folds to for a row predicate (`RowBindingWire` as JSON).
@@ -810,7 +1025,13 @@ pub fn resolve_row_binding(term: &str, bindings_json: &str) -> Result<String, Js
 }
 
 #[wasm_bindgen(js_name = substrateCompletionEvent)]
-pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, args_json: &str, outcome_json: &str) -> Result<String, JsError> {
+pub fn substrate_completion_event(
+    site_json: &str,
+    key: &str,
+    op: &str,
+    args_json: &str,
+    outcome_json: &str,
+) -> Result<String, JsError> {
     api::substrate_completion_event(site_json, key, op, args_json, outcome_json).map_err(js)
 }
 
