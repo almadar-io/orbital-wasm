@@ -2,8 +2,9 @@
 //! and must produce the C-ABI goldens recorded in orbital-core.
 
 use orbital_wasm::api::{
-    check_mutation_access, contract_query_without_program, evaluate_guards, evaluate_many, evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows,
-    trace_effects, KernelApi, ServerApi,
+    check_mutation_access, contract_query_without_program, evaluate_guards, evaluate_many,
+    evaluate_traced, map_listen_payload, resolve_row_binding, scope_rows, trace_effects, KernelApi,
+    ServerApi,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -134,17 +135,72 @@ fn an_empty_schema_is_refused() {
     let err = KernelApi::new(r#"{"name":"Empty","orbitals":[]}"#, "c").err();
     assert!(matches!(
         err,
-        Some(orbital_wasm::api::ApiError::Entry(orbital_core::runtime::kernel::EntryError::NoOrbitals))
+        Some(orbital_wasm::api::ApiError::Entry(
+            orbital_core::runtime::kernel::EntryError::NoOrbitals
+        ))
     ));
+}
+
+#[test]
+fn skinning_bridge_projects_rig_and_affine_json_without_host_math() {
+    use orbital_wasm::api::{
+        skin_apply_affine, skin_compose_affine, skin_invert_affine, skin_triangle_affine,
+        skin_vertex_bounds, skin_vertices, skin_world_matrices,
+    };
+
+    let bones = json!([
+        {"name":"root","parent":null,"pivot":[0,0],"tip":[1,0]},
+        {"name":"child","parent":"root","pivot":[1,0],"tip":[2,0]}
+    ]);
+    let bind = skin_world_matrices(&bones.to_string(), "{}").unwrap();
+    let posed = skin_world_matrices(&bones.to_string(), r#"{"root":90}"#).unwrap();
+    let mesh = json!({"vertices":[{"x":2,"y":0,"u":0,"v":0,
+        "weights":[{"bone":1,"w":1}]}],"triangles":[]});
+    let points = parsed(&skin_vertices(&mesh.to_string(), &bind, &posed).unwrap());
+    assert!((points[0][0].as_f64().unwrap()).abs() < 1e-12);
+    assert!((points[0][1].as_f64().unwrap() - 2.0).abs() < 1e-12);
+
+    let world = parsed(&posed);
+    let child = world[1].to_string();
+    let inverse = skin_invert_affine(&child, 1).unwrap();
+    let identity = skin_compose_affine(&child, &inverse).unwrap();
+    let point = parsed(&skin_apply_affine(&identity, 7.0, -3.0).unwrap());
+    assert!((point[0].as_f64().unwrap() - 7.0).abs() < 1e-12);
+    assert!((point[1].as_f64().unwrap() + 3.0).abs() < 1e-12);
+
+    let triangle =
+        parsed(&skin_triangle_affine("[[0,0],[1,0],[0,1]]", "[[2,3],[4,3],[2,5]]").unwrap());
+    assert_eq!(triangle, json!([2.0, 0.0, 0.0, 2.0, 2.0, 3.0]));
+    let bounds = parsed(&skin_vertex_bounds("[[1,2],[-3,4],[0,-1]]").unwrap());
+    assert_eq!(
+        bounds,
+        json!({"minX":-3.0,"minY":-1.0,"maxX":1.0,"maxY":4.0})
+    );
+
+    let orphan = json!([{"name":"arm","parent":"ghost","pivot":[0,0],"tip":[1,0]}]);
+    let err = skin_world_matrices(&orphan.to_string(), "{}").unwrap_err();
+    assert!(err.contains("unknown parent `ghost`"), "{err}");
+    let err = skin_invert_affine("[0,0,0,0,0,0]", 3).unwrap_err();
+    assert!(err.contains("bone 3"), "{err}");
 }
 
 #[test]
 fn a_host_with_no_program_asks_the_kernel_for_the_empty_answers() {
     let ask = |q: &str| contract_query_without_program(q);
-    assert!(pj(&ask(r#"{"kind":"findExternalInput","orbital":"Cal","trait":"Push","event":"ADD"}"#).unwrap()).is_null());
+    assert!(pj(&ask(
+        r#"{"kind":"findExternalInput","orbital":"Cal","trait":"Push","event":"ADD"}"#
+    )
+    .unwrap())
+    .is_null());
     assert_eq!(pj(&ask(r#"{"kind":"externalInputs"}"#).unwrap()), json!([]));
-    assert_eq!(pj(&ask(r#"{"kind":"findInbound","name":"hook"}"#).unwrap())["answer"]["status"], 404);
-    assert!(ask("{not json").is_err(), "control: a malformed query is a typed refusal");
+    assert_eq!(
+        pj(&ask(r#"{"kind":"findInbound","name":"hook"}"#).unwrap())["answer"]["status"],
+        404
+    );
+    assert!(
+        ask("{not json").is_err(),
+        "control: a malformed query is a typed refusal"
+    );
 }
 
 #[test]
@@ -166,8 +222,14 @@ fn the_declared_contract_is_asked_of_the_kernel_not_read_off_the_program() {
         let ask = |q: &str| server.contract_query(q);
         assert_eq!(pj(&ask(r#"{"kind":"externalInputs"}"#).unwrap()), json!([]));
         let owner = pj(&ask(r#"{"kind":"entityOwner","entity":"NoSuchEntity"}"#).unwrap());
-        assert!(owner.is_null(), "control: an entity no orbital declares has no owner");
-        assert!(ask(r#"{"kind":"noSuchQuery"}"#).is_err(), "control: an unknown query is a typed refusal");
+        assert!(
+            owner.is_null(),
+            "control: an entity no orbital declares has no owner"
+        );
+        assert!(
+            ask(r#"{"kind":"noSuchQuery"}"#).is_err(),
+            "control: an unknown query is a typed refusal"
+        );
         assert!(ask("{not json").is_err());
     }
 }
@@ -227,16 +289,35 @@ fn one_crossing_evaluates_every_binding_of_a_render_against_one_context() {
     let values: Vec<&Value> = out.iter().map(value_of).collect();
     assert_eq!(
         values,
-        vec![&json!(5), &json!(true), &json!("open"), &json!("ar"), &json!("1970-01-01T00:00:01.001Z"), &json!("ADA"), &json!(2), &json!(true)]
+        vec![
+            &json!(5),
+            &json!(true),
+            &json!("open"),
+            &json!("ar"),
+            &json!("1970-01-01T00:00:01.001Z"),
+            &json!("ADA"),
+            &json!(2),
+            &json!(true)
+        ]
     );
 }
 
 #[test]
 fn control_a_failing_expression_is_its_own_outcome_and_an_unbound_root_reads_null() {
     let context = json!({ "entity": { "qty": 3 } });
-    let out = evaluated(&context, &json!([["+", 1, 2], ["/", 1, 0], "@user.id", ["+", 2, 2]]));
-    assert_eq!(value_of(&out[1]), &Value::Null, "division by zero answers null (P-010 ruling 2026-10-25), not an error");
-    let out = evaluated(&context, &json!([["+", 1, 2], ["/", 1], "@user.id", ["+", 2, 2]]));
+    let out = evaluated(
+        &context,
+        &json!([["+", 1, 2], ["/", 1, 0], "@user.id", ["+", 2, 2]]),
+    );
+    assert_eq!(
+        value_of(&out[1]),
+        &Value::Null,
+        "division by zero answers null (P-010 ruling 2026-10-25), not an error"
+    );
+    let out = evaluated(
+        &context,
+        &json!([["+", 1, 2], ["/", 1], "@user.id", ["+", 2, 2]]),
+    );
     assert_eq!(value_of(&out[0]), &json!(3));
     assert_eq!(out[1]["kind"], "error");
     assert!(out[1]["message"].as_str().unwrap().len() > 0);
@@ -268,9 +349,17 @@ fn guards_are_decided_in_one_crossing_as_booleans_and_a_failing_guard_is_its_own
     assert_eq!(verdicts[1], json!({ "kind": "value", "value": false }));
     assert_eq!(verdicts[2]["kind"], "error");
     for not_boolean in [3, 4, 5] {
-        assert_eq!(verdicts[not_boolean]["kind"], "error", "a guard is a boolean, never truthiness: {}", verdicts[not_boolean]);
+        assert_eq!(
+            verdicts[not_boolean]["kind"], "error",
+            "a guard is a boolean, never truthiness: {}",
+            verdicts[not_boolean]
+        );
     }
-    assert_eq!(verdicts[6], json!({ "kind": "value", "value": true }), "control: a boolean guard");
+    assert_eq!(
+        verdicts[6],
+        json!({ "kind": "value", "value": true }),
+        "control: a boolean guard"
+    );
 }
 
 fn traced(context: Value, expression: Value) -> Value {
@@ -278,7 +367,13 @@ fn traced(context: Value, expression: Value) -> Value {
 }
 
 fn steps(trace: &Value, kind: &str) -> Vec<Value> {
-    trace["trace"].as_array().unwrap().iter().filter(|s| s["kind"] == kind).map(|s| s["path"].clone()).collect()
+    trace["trace"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["kind"] == kind)
+        .map(|s| s["path"].clone())
+        .collect()
 }
 
 fn exit_value(trace: &Value, path: Value) -> Value {
@@ -302,28 +397,76 @@ fn a_traced_evaluation_records_each_node_by_path_and_returns_the_untraced_value(
     assert_eq!(exit_value(&trace, json!([2])), json!(6));
     assert_eq!(exit_value(&trace, json!([2, 1])), json!(2));
     assert_eq!(trace["trace"][0], json!({ "kind": "enter", "path": [] }));
-    assert_eq!(trace["trace"].as_array().unwrap().last().unwrap(), &json!({ "kind": "exit", "path": [], "value": 7 }));
-    assert_eq!(steps(&trace, "enter"), vec![json!([]), json!([1]), json!([2]), json!([2, 1]), json!([2, 2])]);
+    assert_eq!(
+        trace["trace"].as_array().unwrap().last().unwrap(),
+        &json!({ "kind": "exit", "path": [], "value": 7 })
+    );
+    assert_eq!(
+        steps(&trace, "enter"),
+        vec![
+            json!([]),
+            json!([1]),
+            json!([2]),
+            json!([2, 1]),
+            json!([2, 2])
+        ]
+    );
 }
 
 #[test]
 fn a_traced_binding_is_its_resolved_value() {
-    let trace = traced(json!({ "entity": { "qty": 3 } }), json!([">", "@entity.qty", 0]));
+    let trace = traced(
+        json!({ "entity": { "qty": 3 } }),
+        json!([">", "@entity.qty", 0]),
+    );
     assert_eq!(exit_value(&trace, json!([1])), json!(3));
 }
 
 #[test]
 fn a_short_circuited_argument_is_skipped_and_control_a_fully_run_call_skips_nothing() {
     let context = json!({ "entity": { "qty": 0 } });
-    assert_eq!(steps(&traced(context.clone(), json!(["and", [">", "@entity.qty", 0], ["=", 1, 1]])), "skip"), vec![json!([2])]);
-    assert_eq!(steps(&traced(context.clone(), json!(["or", ["=", 1, 1], ["=", 2, 2]])), "skip"), vec![json!([2])]);
-    assert_eq!(steps(&traced(context.clone(), json!(["if", [">", "@entity.qty", 5], "big", "small"])), "skip"), vec![json!([2])]);
-    assert_eq!(steps(&traced(context, json!(["and", ["=", 1, 1], ["=", 2, 2]])), "skip"), Vec::<Value>::new());
+    assert_eq!(
+        steps(
+            &traced(
+                context.clone(),
+                json!(["and", [">", "@entity.qty", 0], ["=", 1, 1]])
+            ),
+            "skip"
+        ),
+        vec![json!([2])]
+    );
+    assert_eq!(
+        steps(
+            &traced(context.clone(), json!(["or", ["=", 1, 1], ["=", 2, 2]])),
+            "skip"
+        ),
+        vec![json!([2])]
+    );
+    assert_eq!(
+        steps(
+            &traced(
+                context.clone(),
+                json!(["if", [">", "@entity.qty", 5], "big", "small"])
+            ),
+            "skip"
+        ),
+        vec![json!([2])]
+    );
+    assert_eq!(
+        steps(
+            &traced(context, json!(["and", ["=", 1, 1], ["=", 2, 2]])),
+            "skip"
+        ),
+        Vec::<Value>::new()
+    );
 }
 
 #[test]
 fn a_lambda_body_is_traced_under_its_own_path_once_per_item() {
-    let trace = traced(json!({}), json!(["array/map", ["list", 1, 2, 3], ["fn", "x", ["*", "@x", 2]]]));
+    let trace = traced(
+        json!({}),
+        json!(["array/map", ["list", 1, 2, 3], ["fn", "x", ["*", "@x", 2]]]),
+    );
     let body_exits: Vec<Value> = trace["trace"]
         .as_array()
         .unwrap()
@@ -332,13 +475,22 @@ fn a_lambda_body_is_traced_under_its_own_path_once_per_item() {
         .map(|s| s["value"].clone())
         .collect();
     assert_eq!(body_exits, vec![json!(2), json!(4), json!(6)]);
-    assert_eq!(steps(&trace, "iter").iter().filter(|p| **p == json!([2, 2])).count(), 2);
+    assert_eq!(
+        steps(&trace, "iter")
+            .iter()
+            .filter(|p| **p == json!([2, 2]))
+            .count(),
+        2
+    );
 }
 
 #[test]
 fn equal_literal_arguments_trace_as_separate_nodes() {
     let trace = traced(json!({}), json!(["+", 1, 1]));
-    assert_eq!(steps(&trace, "enter"), vec![json!([]), json!([1]), json!([2])]);
+    assert_eq!(
+        steps(&trace, "enter"),
+        vec![json!([]), json!([1]), json!([2])]
+    );
 }
 
 #[test]
@@ -353,8 +505,16 @@ fn a_failing_trace_keeps_the_steps_up_to_the_failure_and_control_a_success_has_n
         .map(|s| s["path"].clone())
         .collect();
     assert_eq!(failed_exits, vec![json!([2]), json!([])]);
-    assert!(failed["trace"].as_array().unwrap().iter().any(|s| s["kind"] == "exit" && s["path"] == json!([1])));
-    assert!(traced(json!({}), json!(["+", 1, 2]))["trace"].as_array().unwrap().iter().all(|s| s.get("error").is_none()));
+    assert!(failed["trace"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s["kind"] == "exit" && s["path"] == json!([1])));
+    assert!(traced(json!({}), json!(["+", 1, 2]))["trace"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|s| s.get("error").is_none()));
 }
 
 #[test]
@@ -372,8 +532,14 @@ fn a_listen_mapping_rewrites_the_payload_and_control_no_mapping_passes_it_throug
         &payload.to_string(),
     )
     .unwrap();
-    assert_eq!(pj(&mapped), json!({ "rowId": "r1", "double": 8, "label": "fixed", "nulled": null }));
-    assert_eq!(pj(&map_listen_payload("", &payload.to_string()).unwrap()), payload);
+    assert_eq!(
+        pj(&mapped),
+        json!({ "rowId": "r1", "double": 8, "label": "fixed", "nulled": null })
+    );
+    assert_eq!(
+        pj(&map_listen_payload("", &payload.to_string()).unwrap()),
+        payload
+    );
 }
 
 fn rows() -> Value {
@@ -381,8 +547,20 @@ fn rows() -> Value {
 }
 
 fn scoped(user: Value, policy: &str, filter: &str) -> Vec<String> {
-    let kept = scope_rows(&json!({ "user": user }).to_string(), &rows().to_string(), policy, filter, "Ticket").unwrap();
-    pj(&kept).as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect()
+    let kept = scope_rows(
+        &json!({ "user": user }).to_string(),
+        &rows().to_string(),
+        policy,
+        filter,
+        "Ticket",
+    )
+    .unwrap();
+    pj(&kept)
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap().to_string())
+        .collect()
 }
 
 #[test]
@@ -403,14 +581,24 @@ fn control_no_policy_and_no_filter_keeps_every_row_and_a_failing_policy_drops_th
 
 fn verdict(op: &str, user: Value, policy: &str) -> Value {
     let row = json!({ "id": "a", "owner": "u1" });
-    pj(&check_mutation_access(op, &json!({ "user": user }).to_string(), &row.to_string(), policy, "Ticket").unwrap())
+    pj(&check_mutation_access(
+        op,
+        &json!({ "user": user }).to_string(),
+        &row.to_string(),
+        policy,
+        "Ticket",
+    )
+    .unwrap())
 }
 
 #[test]
 fn a_mutation_directive_allows_the_owner_and_denies_another_viewer_with_the_reason() {
     let policy = json!(["=", "@entity.owner", "@user.id"]).to_string();
     for op in ["create", "update", "delete"] {
-        assert_eq!(verdict(op, json!({ "id": "u1" }), &policy), json!({ "allowed": true }));
+        assert_eq!(
+            verdict(op, json!({ "id": "u1" }), &policy),
+            json!({ "allowed": true })
+        );
         let denied = verdict(op, json!({ "id": "u2" }), &policy);
         assert_eq!(denied["allowed"], false);
         assert!(denied["message"].as_str().unwrap().contains("Ticket"));
@@ -419,8 +607,18 @@ fn a_mutation_directive_allows_the_owner_and_denies_another_viewer_with_the_reas
 
 #[test]
 fn control_a_mutation_with_no_directive_is_allowed_and_a_failing_directive_denies() {
-    assert_eq!(verdict("update", json!({ "id": "u2" }), ""), json!({ "allowed": true }));
-    assert_eq!(verdict("update", json!({ "id": "u1" }), &json!(["/", 1]).to_string())["allowed"], false);
+    assert_eq!(
+        verdict("update", json!({ "id": "u2" }), ""),
+        json!({ "allowed": true })
+    );
+    assert_eq!(
+        verdict(
+            "update",
+            json!({ "id": "u1" }),
+            &json!(["/", 1]).to_string()
+        )["allowed"],
+        false
+    );
     assert!(check_mutation_access("read", "{}", "{}", "", "Ticket").is_err());
 }
 
@@ -437,8 +635,14 @@ fn a_row_binding_term_folds_to_a_scalar_a_list_or_a_typed_refusal() {
     assert_eq!(fold("@user.id"), json!({ "kind": "value", "value": "u1" }));
     assert_eq!(fold("@payload.q"), json!({ "kind": "value", "value": 7 }));
     assert_eq!(fold("@config.k"), json!({ "kind": "value", "value": null }));
-    assert_eq!(fold("@now"), json!({ "kind": "value", "value": "1970-01-01T00:00:00.005Z" }));
-    assert_eq!(fold("@user.teams"), json!({ "kind": "list", "values": ["x", "y"] }));
+    assert_eq!(
+        fold("@now"),
+        json!({ "kind": "value", "value": "1970-01-01T00:00:00.005Z" })
+    );
+    assert_eq!(
+        fold("@user.teams"),
+        json!({ "kind": "list", "values": ["x", "y"] })
+    );
     assert_eq!(fold("@user.profile")["kind"], "inexpressible");
     assert_eq!(fold("@user.missing")["kind"], "unspecialised");
     assert_eq!(fold("@entity.id")["kind"], "inexpressible");
@@ -462,10 +666,17 @@ fn a_string_operator_refuses_an_absent_value_and_control_a_present_string_null_s
         ]),
     );
     for absent in &out[..4] {
-        assert_eq!(absent["kind"], "error", "an absent value is not a string (EXEC-EVAL-2): {absent}");
+        assert_eq!(
+            absent["kind"], "error",
+            "an absent value is not a string (EXEC-EVAL-2): {absent}"
+        );
     }
     let values: Vec<&Value> = out[4..].iter().map(value_of).collect();
-    assert_eq!(values, vec![&json!("anull"), &json!("NULL"), &json!("n=3"), &json!("")], "controls: present values, and `default` says what absence means");
+    assert_eq!(
+        values,
+        vec![&json!("anull"), &json!("NULL"), &json!("n=3"), &json!("")],
+        "controls: present values, and `default` says what absence means"
+    );
 }
 
 #[test]
@@ -477,7 +688,12 @@ fn trace_effects_runs_a_list_against_a_row_through_the_wasm_api() {
     assert_eq!(out["emitted"][0]["event"], "DONE");
     assert_eq!(out["emitted"][0]["payload"]["n"].as_f64(), Some(5.0));
     assert_eq!(out["effects"][0]["status"], "executed");
-    assert!(trace_effects("{}", "not json").unwrap_err().contains("parse effects"), "a malformed list is an error");
+    assert!(
+        trace_effects("{}", "not json")
+            .unwrap_err()
+            .contains("parse effects"),
+        "a malformed list is an error"
+    );
 }
 
 fn greeting_schema() -> String {
@@ -503,9 +719,16 @@ fn greeting_schema() -> String {
 #[test]
 fn the_client_kernel_paints_i18n_from_the_catalogs_the_host_sets() {
     let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
-    kernel.set_messages(r#"["en"]"#, r#"{"en":{"site:hero.title":"Hello"}}"#).unwrap();
+    kernel
+        .set_messages(r#"["en"]"#, r#"{"en":{"site:hero.title":"Hello"}}"#)
+        .unwrap();
     let wire = parsed(&kernel.dispatch("HomePage", None, "INIT", None).unwrap());
-    assert!(wire["response"]["clientEffectsByTrait"].to_string().contains("\"Hello\""), "{wire:#}");
+    assert!(
+        wire["response"]["clientEffectsByTrait"]
+            .to_string()
+            .contains("\"Hello\""),
+        "{wire:#}"
+    );
 }
 
 fn sign_out_schema(sites: Value, effects: Value) -> String {
@@ -531,37 +754,79 @@ fn sign_out_schema(sites: Value, effects: Value) -> String {
 
 #[test]
 fn the_client_kernel_hands_a_client_site_host_port_effect_back_as_a_host_ask() {
-    let kernel = KernelApi::new(&sign_out_schema(json!({ "auth/sign-out": "client", "audio/play-sound": "client" }), json!([["audio/play-sound", "bye"], ["auth/sign-out"]])), "c1").unwrap();
+    let kernel = KernelApi::new(
+        &sign_out_schema(
+            json!({ "auth/sign-out": "client", "audio/play-sound": "client" }),
+            json!([["audio/play-sound", "bye"], ["auth/sign-out"]]),
+        ),
+        "c1",
+    )
+    .unwrap();
     let wire = parsed(&kernel.dispatch("Chrome", None, "SIGN_OUT", None).unwrap());
-    let effects: Vec<&Value> = wire["response"]["clientEffectsByTrait"].as_array().expect("client effects").iter().map(|e| &e["effect"]).collect();
-    assert_eq!(effects, vec![&json!(["host-ask", "audio/play-sound", ["bye"]]), &json!(["host-ask", "auth/sign-out", []])], "{wire:#}");
-    assert!(wire["serverLegs"].as_array().is_none_or(Vec::is_empty), "control: a client-site ask posts no server leg: {wire:#}");
+    let effects: Vec<&Value> = wire["response"]["clientEffectsByTrait"]
+        .as_array()
+        .expect("client effects")
+        .iter()
+        .map(|e| &e["effect"])
+        .collect();
+    assert_eq!(
+        effects,
+        vec![
+            &json!(["host-ask", "audio/play-sound", ["bye"]]),
+            &json!(["host-ask", "auth/sign-out", []])
+        ],
+        "{wire:#}"
+    );
+    assert!(
+        wire["serverLegs"].as_array().is_none_or(Vec::is_empty),
+        "control: a client-site ask posts no server leg: {wire:#}"
+    );
 }
 
 #[test]
 fn the_client_kernel_hands_a_routed_host_ask_back_with_its_return_address() {
     let sign_in = json!(["auth/sign-in", { "method": "google" }, { "key": "k1", "emit": { "success": "SIGNED_IN", "failure": "SIGN_IN_FAILED" } }]);
-    let kernel = KernelApi::new(&sign_out_schema(json!({ "auth/sign-in": "client" }), json!([sign_in])), "c1").unwrap();
+    let kernel = KernelApi::new(
+        &sign_out_schema(json!({ "auth/sign-in": "client" }), json!([sign_in])),
+        "c1",
+    )
+    .unwrap();
     let wire = parsed(&kernel.dispatch("Chrome", None, "SIGN_OUT", None).unwrap());
-    let effects: Vec<&Value> = wire["response"]["clientEffectsByTrait"].as_array().expect("client effects").iter().map(|e| &e["effect"]).collect();
+    let effects: Vec<&Value> = wire["response"]["clientEffectsByTrait"]
+        .as_array()
+        .expect("client effects")
+        .iter()
+        .map(|e| &e["effect"])
+        .collect();
     assert_eq!(
         effects,
-        vec![&json!(["host-ask", "auth/sign-in", [{ "method": "google" }], { "trait": "Chrome", "key": "k1", "success": "SIGNED_IN", "failure": "SIGN_IN_FAILED" }])],
+        vec![
+            &json!(["host-ask", "auth/sign-in", [{ "method": "google" }], { "trait": "Chrome", "key": "k1", "success": "SIGNED_IN", "failure": "SIGN_IN_FAILED" }])
+        ],
         "{wire:#}"
     );
 }
 
 #[test]
 fn control_a_server_site_effect_is_never_a_host_ask() {
-    let kernel = KernelApi::new(&sign_out_schema(json!({}), json!([["persist", "create", "HomeView", {}]])), "c1").unwrap();
+    let kernel = KernelApi::new(
+        &sign_out_schema(json!({}), json!([["persist", "create", "HomeView", {}]])),
+        "c1",
+    )
+    .unwrap();
     let wire = parsed(&kernel.dispatch("Chrome", None, "SIGN_OUT", None).unwrap());
-    assert!(!wire["response"].to_string().contains("host-ask"), "{wire:#}");
+    assert!(
+        !wire["response"].to_string().contains("host-ask"),
+        "{wire:#}"
+    );
 }
 
 #[test]
 fn control_a_malformed_catalog_is_refused_by_name() {
     let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
-    let err = kernel.set_messages(r#"["en"]"#, r#"{"en":["not","a","map"]}"#).unwrap_err();
+    let err = kernel
+        .set_messages(r#"["en"]"#, r#"{"en":["not","a","map"]}"#)
+        .unwrap_err();
     assert!(err.contains("catalogs_json"), "{err}");
 }
 
@@ -588,7 +853,15 @@ fn fired_names(kernel: &KernelApi, now_ms: u64) -> Vec<String> {
     let mut names: Vec<String> = kernel
         .frame(now_ms)
         .unwrap()
-        .map(|wire| parsed(&wire)["fired"].as_object().unwrap().values().flat_map(|ticks| ticks.as_array().unwrap()).map(|t| t["trait"].as_str().unwrap().to_string()).collect())
+        .map(|wire| {
+            parsed(&wire)["fired"]
+                .as_object()
+                .unwrap()
+                .values()
+                .flat_map(|ticks| ticks.as_array().unwrap())
+                .map(|t| t["trait"].as_str().unwrap().to_string())
+                .collect()
+        })
         .unwrap_or_default();
     names.sort();
     names
@@ -599,9 +872,17 @@ fn a_visible_tick_is_skipped_once_the_host_reports_its_trait_off_screen() {
     let kernel = KernelApi::new(&visible_schema(), "c1").unwrap();
     kernel.set_trait_on_screen("V", false);
     kernel.set_trait_on_screen("P", false);
-    assert_eq!(fired_names(&kernel, 0), ["P"], "EXEC-TICK-4: only the plain tick fires off screen");
+    assert_eq!(
+        fired_names(&kernel, 0),
+        ["P"],
+        "EXEC-TICK-4: only the plain tick fires off screen"
+    );
     kernel.set_trait_on_screen("V", true);
-    assert_eq!(fired_names(&kernel, 1), ["P", "V"], "back on screen it resumes");
+    assert_eq!(
+        fired_names(&kernel, 1),
+        ["P", "V"],
+        "back on screen it resumes"
+    );
 }
 
 #[test]
@@ -611,15 +892,19 @@ fn control_a_visible_tick_the_host_never_reported_fires() {
 }
 
 fn ordered_kernel() -> KernelApi {
-    let schema = std::fs::read_to_string(embed_dir().join("resolved").join("basic-entity.json")).unwrap();
+    let schema =
+        std::fs::read_to_string(embed_dir().join("resolved").join("basic-entity.json")).unwrap();
     KernelApi::new(&schema, "golden-client").unwrap()
 }
 
 fn flight_of(kernel: &KernelApi, event: &str) -> u64 {
-    parsed(&kernel.dispatch("TaskCRUD", None, event, None).unwrap())["flight"].as_u64().expect("the dispatch owes a leg")
+    parsed(&kernel.dispatch("TaskCRUD", None, event, None).unwrap())["flight"]
+        .as_u64()
+        .expect("the dispatch owes a leg")
 }
 
-const ANSWER: &str = r#"{"success":true,"transitioned":true,"states":{"TaskCRUD":"listing"},"emittedEvents":[]}"#;
+const ANSWER: &str =
+    r#"{"success":true,"transitioned":true,"states":{"TaskCRUD":"listing"},"emittedEvents":[]}"#;
 
 #[test]
 fn an_answer_ahead_of_an_older_flight_is_queued_and_folded_by_next_fold_once_that_flight_ends() {
@@ -630,9 +915,17 @@ fn an_answer_ahead_of_an_older_flight_is_queued_and_folded_by_next_fold_once_tha
     let queued = parsed(&kernel.fold_in_order(second, ANSWER, None, None).unwrap());
     assert_eq!(queued["status"], "queued");
     assert!(kernel.next_fold().unwrap().is_none());
-    assert_eq!(parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"], "applied");
+    assert_eq!(
+        parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"],
+        "applied"
+    );
     assert!(kernel.end_flight(first));
-    let next = parsed(&kernel.next_fold().unwrap().expect("the queued answer folds"));
+    let next = parsed(
+        &kernel
+            .next_fold()
+            .unwrap()
+            .expect("the queued answer folds"),
+    );
     assert_eq!(next["outcome"], "applied");
     assert_eq!(next["ticket"], queued["ticket"]);
     assert!(kernel.next_fold().unwrap().is_none());
@@ -642,8 +935,13 @@ fn an_answer_ahead_of_an_older_flight_is_queued_and_folded_by_next_fold_once_tha
 fn control_answers_in_dispatch_order_fold_at_once_and_an_unknown_flight_is_an_error() {
     let kernel = ordered_kernel();
     let first = flight_of(&kernel, "INIT");
-    assert_eq!(parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"], "applied");
-    assert!(kernel.fold_in_order(first + 100, ANSWER, None, None).is_err());
+    assert_eq!(
+        parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"],
+        "applied"
+    );
+    assert!(kernel
+        .fold_in_order(first + 100, ANSWER, None, None)
+        .is_err());
     assert!(!kernel.end_flight(first + 100));
 }
 
@@ -716,17 +1014,27 @@ fn http_pack(keyword: &str, effect: Option<&str>) -> String {
 
 #[test]
 fn validate_packs_refuses_one_word_spelled_two_ways_naming_pack_section_word() {
-    let err = orbital_wasm::api::validate_packs(&http_pack("qi-http-a", Some("qi-http-b"))).unwrap_err();
+    let err =
+        orbital_wasm::api::validate_packs(&http_pack("qi-http-a", Some("qi-http-b"))).unwrap_err();
     assert!(
-        err.contains("lolo-qi") && err.contains("Inconsistent effects.http") && err.contains("qi-http-a") && err.contains("qi-http-b"),
+        err.contains("lolo-qi")
+            && err.contains("Inconsistent effects.http")
+            && err.contains("qi-http-a")
+            && err.contains("qi-http-b"),
         "{err}"
     );
 }
 
 #[test]
 fn validate_packs_control_consistent_and_single_section_packs_load() {
-    assert_eq!(orbital_wasm::api::validate_packs(&http_pack("qi-http", Some("qi-http"))), Ok(()));
-    assert_eq!(orbital_wasm::api::validate_packs(&http_pack("qi-http", None)), Ok(()));
+    assert_eq!(
+        orbital_wasm::api::validate_packs(&http_pack("qi-http", Some("qi-http"))),
+        Ok(())
+    );
+    assert_eq!(
+        orbital_wasm::api::validate_packs(&http_pack("qi-http", None)),
+        Ok(())
+    );
 }
 
 #[test]
@@ -756,16 +1064,73 @@ fn self_listening_schema() -> String {
 
 #[test]
 fn deliver_origin_emit_does_not_run_the_self_listening_emitter_twice() {
-    let emitted = json!({ "event": "PROGRESS", "source": { "orbital": "Main", "trait": "Caller" } }).to_string();
+    let emitted =
+        json!({ "event": "PROGRESS", "source": { "orbital": "Main", "trait": "Caller" } })
+            .to_string();
     let origin = KernelApi::new(&self_listening_schema(), "tab").unwrap();
-    origin.dispatch("Caller", None, "PROGRESS", Some("{}")).unwrap();
+    origin
+        .dispatch("Caller", None, "PROGRESS", Some("{}"))
+        .unwrap();
     let flight = origin.open_flight();
-    assert_eq!(parsed(&origin.deliver_origin_emit(flight, &emitted).unwrap())["status"], json!("applied"));
+    assert_eq!(
+        parsed(&origin.deliver_origin_emit(flight, &emitted).unwrap())["status"],
+        json!("applied")
+    );
     assert_eq!(origin.get_state("Caller", None), "once");
 
     let peer = KernelApi::new(&self_listening_schema(), "tab").unwrap();
-    peer.dispatch("Caller", None, "PROGRESS", Some("{}")).unwrap();
+    peer.dispatch("Caller", None, "PROGRESS", Some("{}"))
+        .unwrap();
     let flight = peer.open_flight();
     peer.deliver_emit_to_listeners(flight, &emitted).unwrap();
-    assert_eq!(peer.get_state("Caller", None), "twice", "control: a peer delivery runs the self route again");
+    assert_eq!(
+        peer.get_state("Caller", None),
+        "twice",
+        "control: a peer delivery runs the self route again"
+    );
+}
+
+#[test]
+fn fx_projector_api_matches_canvas() {
+    let layer = json!({
+        "tickMs": 500, "fontFamily": "sans-serif", "textColor": "#fff",
+        "items": [{"id":"fx-1","type":"hit","position":{"x":1,"y":0},"vx":0,"vz":0,"gravity":0,"ttl":2,"maxTtl":4,"bornAt":1000}],
+        "presets": [{"type":"hit","shape":"ring","size":0.5,"color":"#fff"}]
+    });
+    let actual =
+        orbital_wasm::api::expand_fx_layer(&layer.to_string(), 1500.0, "2d", 32.0).unwrap();
+    let expected = orbital_canvas::fx_projection::expand_layer(&layer, 1500.0, "2d", 32.0).unwrap();
+    assert_eq!(parsed(&actual), json!(expected));
+    assert!(
+        orbital_wasm::api::expand_fx_layer(&layer.to_string(), 1500.0, "screen", 32.0).is_err()
+    );
+
+    let mut missing = layer.clone();
+    missing.as_object_mut().unwrap().remove("tickMs");
+    let err =
+        orbital_wasm::api::expand_fx_layer(&missing.to_string(), 1500.0, "2d", 32.0).unwrap_err();
+    assert!(err.contains("tickMs"), "{err}");
+
+    let item = &layer["items"][0];
+    let presets = &layer["presets"];
+    let resolved = reported(orbital_wasm::api::resolve_fx_view(
+        &item.to_string(),
+        Some(&presets.to_string()),
+    ));
+    assert_eq!(
+        resolved,
+        orbital_canvas::fx_projection::resolve_view(item, presets.as_array().map(Vec::as_slice))
+    );
+    assert_eq!(
+        reported(orbital_wasm::api::fx_lifecycle(
+            &resolved.to_string(),
+            1500.0,
+            500.0
+        )),
+        orbital_canvas::fx_projection::lifecycle_view(&resolved, 1500.0, 500.0).unwrap()
+    );
+    assert_eq!(
+        orbital_wasm::api::fx_hash01("fx-😀", 7),
+        orbital_canvas::fx_projection::fx_hash01("fx-😀", 7)
+    );
 }

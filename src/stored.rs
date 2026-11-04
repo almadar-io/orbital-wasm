@@ -3,9 +3,9 @@
 //! still waits on the host lists only the requests the host owns, and `resume` takes only those answers.
 
 use crate::api::{ApiError, ServerApi};
-use orbital_core::runtime::kernel::EntryError;
 use orbital_core::embed::wire::{IoAnswerWire, IoRequestWire};
 use orbital_core::runtime::entity_source::EntitySource;
+use orbital_core::runtime::kernel::EntryError;
 use orbital_core::runtime::resumable::{BlockingHost, IoRequest};
 use orbital_core::runtime::row_query::{QueryCapabilities, WriteCapabilities};
 use orbital_core::{EntityRef, OrbitalSchema};
@@ -74,7 +74,8 @@ impl StoredServer {
                 if let Some(collection) = &def.collection {
                     source.bind_collection(&def.name, collection);
                 }
-                api.set_capabilities(&def.name, &query, &write).map_err(ApiError::Marshal)?;
+                api.set_capabilities(&def.name, &query, &write)
+                    .map_err(ApiError::Marshal)?;
             }
         }
         Ok(Self {
@@ -101,13 +102,17 @@ impl StoredServer {
 
     /// [`ServerApi::next`], the started request's row asks answered from the store.
     pub fn next(&self) -> Result<String, String> {
-        let next: Value = serde_json::from_str(&self.api.next()?).map_err(|e| format!("parse next: {e}"))?;
+        let next: Value =
+            serde_json::from_str(&self.api.next()?).map_err(|e| format!("parse next: {e}"))?;
         let Value::Object(mut started) = next else {
             return json(&next);
         };
         if let Some(progress) = started.remove("progress") {
             let pumped = self.pump(json(&progress)?, Flight::Dispatch)?;
-            started.insert("progress".to_string(), serde_json::from_str(&pumped).map_err(|e| format!("parse progress: {e}"))?);
+            started.insert(
+                "progress".to_string(),
+                serde_json::from_str(&pumped).map_err(|e| format!("parse progress: {e}"))?,
+            );
         }
         json(&started)
     }

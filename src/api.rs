@@ -4,7 +4,9 @@
 
 use orbital_core::effects::MountSeed;
 use orbital_core::embed::wire::{FoldProgressWire, FoldedNextWire};
-use orbital_core::embed::{parse_theme_mode, EmbeddedKernel, EmbeddedServer, FoldBase, FoldProgress};
+use orbital_core::embed::{
+    parse_theme_mode, EmbeddedKernel, EmbeddedServer, FoldBase, FoldProgress,
+};
 use orbital_core::runtime::kernel::EntryError;
 use orbital_core::runtime::TraitSnapshot;
 use orbital_core::{EventResponse, OrbitalSchema, Value};
@@ -48,12 +50,14 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> Result<T, St
 }
 
 fn side_of(side: &str) -> Result<orbital_core::protocols::ProtocolSide, String> {
-    serde_json::from_value(serde_json::Value::String(side.to_string())).map_err(|e| format!("parse side: {e}"))
+    serde_json::from_value(serde_json::Value::String(side.to_string()))
+        .map_err(|e| format!("parse side: {e}"))
 }
 
 impl KernelApi {
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, ApiError> {
-        let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
+        let schema: OrbitalSchema =
+            parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
         Ok(Self {
             embedded: EmbeddedKernel::new(schema, client_id)?,
             last_error: Mutex::new(String::new()),
@@ -138,14 +142,21 @@ impl KernelApi {
         self.record((|| {
             let response: EventResponse = parse(response_json, "response_json")?;
             let already: HashSet<(String, String)> = match already_delivered_json {
-                Some(s) if !s.is_empty() => parse::<Vec<(String, String)>>(s, "already_delivered_json")?.into_iter().collect(),
+                Some(s) if !s.is_empty() => {
+                    parse::<Vec<(String, String)>>(s, "already_delivered_json")?
+                        .into_iter()
+                        .collect()
+                }
                 _ => HashSet::new(),
             };
             let base: Option<FoldBase> = match base_json {
                 Some(s) if !s.is_empty() => Some(parse(s, "base_json")?),
                 _ => None,
             };
-            let progress = match self.embedded.fold_in_order(flight, response, already, base)? {
+            let progress = match self
+                .embedded
+                .fold_in_order(flight, response, already, base)?
+            {
                 FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
                 FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
             };
@@ -155,7 +166,11 @@ impl KernelApi {
 
     /// [`Self::fold_in_order`] for an emit that entered from outside the kernel: delivered to its declared listeners
     /// only (guards and payload mapping included), a `FoldProgressWire` as JSON.
-    pub fn deliver_emit_to_listeners(&self, flight: u64, emitted_json: &str) -> Result<String, String> {
+    pub fn deliver_emit_to_listeners(
+        &self,
+        flight: u64,
+        emitted_json: &str,
+    ) -> Result<String, String> {
         self.record((|| {
             let emitted: orbital_core::EmittedEvent = parse(emitted_json, "emitted_json")?;
             let progress = match self.embedded.deliver_emit_to_listeners(flight, emitted)? {
@@ -186,8 +201,14 @@ impl KernelApi {
                 .next_fold()
                 .map(|next| {
                     to_json(&match next.outcome {
-                        Ok(fold) => FoldedNextWire::Applied { ticket: next.ticket, fold },
-                        Err(error) => FoldedNextWire::Failed { ticket: next.ticket, error },
+                        Ok(fold) => FoldedNextWire::Applied {
+                            ticket: next.ticket,
+                            fold,
+                        },
+                        Err(error) => FoldedNextWire::Failed {
+                            ticket: next.ticket,
+                            error,
+                        },
                     })
                 })
                 .transpose(),
@@ -308,7 +329,10 @@ impl KernelApi {
     /// The theme key the server bound to this client's session with `theme/set`, mirrored from its frames; `None` when
     /// none is bound and the declared themes apply (G-CROSS-395).
     pub fn session_theme(&self) -> Option<String> {
-        self.embedded.kernel().session_theme().map(|key| key.to_string())
+        self.embedded
+            .kernel()
+            .session_theme()
+            .map(|key| key.to_string())
     }
 
     pub fn trait_config(&self, trait_name: &str) -> Result<String, String> {
@@ -373,7 +397,12 @@ impl KernelApi {
 
     /// The page `mount_key` holds `traits_json`, opened at `route_path` if it has one: the seeds to mount and the traits
     /// that left, an `Entered` as JSON.
-    pub fn enter(&self, route_path: Option<&str>, mount_key: &str, traits_json: &str) -> Result<String, String> {
+    pub fn enter(
+        &self,
+        route_path: Option<&str>,
+        mount_key: &str,
+        traits_json: &str,
+    ) -> Result<String, String> {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json")
                 .and_then(|t| self.embedded.enter(route_path, mount_key, t))
@@ -412,15 +441,22 @@ impl KernelApi {
 
     /// The circuit a client mounts for `page` or `route` (neither: the initial page), a `PageCircuit` as JSON.
     pub fn page_circuit(&self, page: Option<&str>, route: Option<&str>) -> Result<String, String> {
-        self.record(self.embedded.page_circuit(page, route).and_then(|c| to_json(&c)))
+        self.record(
+            self.embedded
+                .page_circuit(page, route)
+                .and_then(|c| to_json(&c)),
+        )
     }
 
     /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
     pub fn contract_query(&self, query_json: &str) -> Result<String, String> {
         self.record(
-            parse::<orbital_core::runtime::kernel::contract_query::ContractQuery>(query_json, "query_json")
-                .and_then(|query| self.embedded.contract_query(query))
-                .and_then(|answer| to_json(&answer)),
+            parse::<orbital_core::runtime::kernel::contract_query::ContractQuery>(
+                query_json,
+                "query_json",
+            )
+            .and_then(|query| self.embedded.contract_query(query))
+            .and_then(|answer| to_json(&answer)),
         )
     }
 
@@ -461,7 +497,8 @@ impl ServerApi {
         resolved_schema_json: &str,
         lazy: Option<std::sync::Arc<dyn orbital_core::runtime::LazySource>>,
     ) -> Result<Self, ApiError> {
-        let schema: OrbitalSchema = parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
+        let schema: OrbitalSchema =
+            parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
         Ok(Self {
             embedded: EmbeddedServer::with_lazy_source(schema, lazy)?,
             last_error: Mutex::new(String::new()),
@@ -486,7 +523,9 @@ impl ServerApi {
     }
 
     pub fn fork_program(&self, program_json: &str) -> Result<Self, ApiError> {
-        let schema: OrbitalSchema = self.record(parse(program_json, "program_json")).map_err(ApiError::Marshal)?;
+        let schema: OrbitalSchema = self
+            .record(parse(program_json, "program_json"))
+            .map_err(ApiError::Marshal)?;
         Ok(Self {
             embedded: self.record(self.embedded.fork_program(schema))?,
             last_error: Mutex::new(String::new()),
@@ -523,7 +562,11 @@ impl ServerApi {
         self.record(self.embedded.tls_complete_json(key, outcome_json))
     }
 
-    pub fn live_item_delivered(&self, item_json: &str, client_id: Option<&str>) -> Result<bool, String> {
+    pub fn live_item_delivered(
+        &self,
+        item_json: &str,
+        client_id: Option<&str>,
+    ) -> Result<bool, String> {
         self.record(self.embedded.live_item_delivered(item_json, client_id))
     }
 
@@ -587,7 +630,8 @@ impl ServerApi {
     /// The program (as JSON) whose declared credentials this server's credential effects manage beside its own.
     pub fn set_managed_program(&self, program_json: &str) -> Result<(), String> {
         self.record(
-            parse::<serde_json::Value>(program_json, "program_json").map(|p| self.embedded.set_managed_program(&p)),
+            parse::<serde_json::Value>(program_json, "program_json")
+                .map(|p| self.embedded.set_managed_program(&p)),
         )
     }
 
@@ -641,20 +685,32 @@ impl ServerApi {
 
     /// The circuit a client mounts for `page` or `route` (neither: the initial page), a `PageCircuit` as JSON.
     pub fn page_circuit(&self, page: Option<&str>, route: Option<&str>) -> Result<String, String> {
-        self.record(self.embedded.page_circuit(page, route).and_then(|c| to_json(&c)))
+        self.record(
+            self.embedded
+                .page_circuit(page, route)
+                .and_then(|c| to_json(&c)),
+        )
     }
 
     /// One question about the registered program (a `ContractQuery` as JSON): its answer as JSON.
     pub fn contract_query(&self, query_json: &str) -> Result<String, String> {
         self.record(
-            parse::<orbital_core::runtime::kernel::contract_query::ContractQuery>(query_json, "query_json")
-                .and_then(|query| self.embedded.contract_query(query))
-                .and_then(|answer| to_json(&answer)),
+            parse::<orbital_core::runtime::kernel::contract_query::ContractQuery>(
+                query_json,
+                "query_json",
+            )
+            .and_then(|query| self.embedded.contract_query(query))
+            .and_then(|answer| to_json(&answer)),
         )
     }
 
     /// `client` mounted the traits of `traits_json` (`string[]`) of `orbital`: their mount-scoped ticks fire while any client holds them.
-    pub fn mount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), String> {
+    pub fn mount_client(
+        &self,
+        client: &str,
+        orbital: &str,
+        traits_json: &str,
+    ) -> Result<(), String> {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json")
                 .map(|t| self.embedded.mount_client(client, orbital, t)),
@@ -662,7 +718,12 @@ impl ServerApi {
     }
 
     /// `client` unmounted the traits of `traits_json` (`string[]`) of `orbital`.
-    pub fn unmount_client(&self, client: &str, orbital: &str, traits_json: &str) -> Result<(), String> {
+    pub fn unmount_client(
+        &self,
+        client: &str,
+        orbital: &str,
+        traits_json: &str,
+    ) -> Result<(), String> {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json")
                 .map(|t| self.embedded.unmount_client(client, orbital, t)),
@@ -749,13 +810,73 @@ pub fn os_glob_matches(glob: &str, path: &str) -> bool {
 pub fn parse_event_request(payload_json: &str, options_json: &str) -> Result<String, String> {
     let payload: serde_json::Value = parse(payload_json, "payload_json")?;
     let options: serde_json::Map<String, serde_json::Value> = parse(options_json, "options_json")?;
-    to_json(&orbital_core::EventRequest::from_dispatch(payload, |key| options.get(key).cloned())?)
+    to_json(&orbital_core::EventRequest::from_dispatch(
+        payload,
+        |key| options.get(key).cloned(),
+    )?)
 }
 
 /// Whether the Chrome match pattern `pattern` matches `url`.
 pub fn event_wires(schema_json: &str) -> Result<String, String> {
     let schema: OrbitalSchema = parse(schema_json, "schema_json")?;
     to_json(&orbital_core::event_wires::event_wires(&schema))
+}
+
+pub fn skin_world_matrices(bones_json: &str, pose_json: &str) -> Result<String, String> {
+    let bones = parse::<Vec<orbital_canvas::skinning_2d::BoneDef>>(bones_json, "bones_json")?;
+    let pose = parse::<orbital_canvas::skinning_2d::Pose>(pose_json, "pose_json")?;
+    let worlds = orbital_canvas::skinning_2d::compute_world_matrices(&bones, &pose)
+        .map_err(|e| e.to_string())?;
+    to_json(&worlds)
+}
+
+pub fn skin_vertices(
+    mesh_json: &str,
+    bind_json: &str,
+    current_json: &str,
+) -> Result<String, String> {
+    let mesh = parse::<orbital_canvas::skinning_2d::SkinMesh>(mesh_json, "mesh_json")?;
+    let bind = parse::<Vec<orbital_canvas::skinning_2d::Affine2D>>(bind_json, "bind_json")?;
+    let current =
+        parse::<Vec<orbital_canvas::skinning_2d::Affine2D>>(current_json, "current_json")?;
+    let points = orbital_canvas::skinning_2d::skin_vertices(&mesh, &bind, &current)
+        .map_err(|e| e.to_string())?;
+    to_json(&points)
+}
+
+pub fn skin_compose_affine(a_json: &str, b_json: &str) -> Result<String, String> {
+    let a = parse::<orbital_canvas::skinning_2d::Affine2D>(a_json, "a_json")?;
+    let b = parse::<orbital_canvas::skinning_2d::Affine2D>(b_json, "b_json")?;
+    to_json(&orbital_canvas::skinning_2d::compose_affine(a, b))
+}
+
+pub fn skin_invert_affine(matrix_json: &str, bone: u32) -> Result<String, String> {
+    let matrix = parse::<orbital_canvas::skinning_2d::Affine2D>(matrix_json, "matrix_json")?;
+    let inverse = orbital_canvas::skinning_2d::invert_affine(matrix, bone as usize)
+        .map_err(|e| e.to_string())?;
+    to_json(&inverse)
+}
+
+pub fn skin_apply_affine(matrix_json: &str, x: f64, y: f64) -> Result<String, String> {
+    let matrix = parse::<orbital_canvas::skinning_2d::Affine2D>(matrix_json, "matrix_json")?;
+    to_json(&orbital_canvas::skinning_2d::apply_affine(matrix, x, y))
+}
+
+pub fn skin_triangle_affine(src_json: &str, dst_json: &str) -> Result<String, String> {
+    let src = parse::<[[f64; 2]; 3]>(src_json, "src_json")?;
+    let dst = parse::<[[f64; 2]; 3]>(dst_json, "dst_json")?;
+    to_json(&orbital_canvas::skinning_2d::triangle_affine(src, dst))
+}
+
+pub fn skin_vertex_bounds(points_json: &str) -> Result<String, String> {
+    let points = parse::<Vec<[f64; 2]>>(points_json, "points_json")?;
+    let bounds =
+        orbital_canvas::skinning_2d::vertex_bounds(&points).map(|[min_x, min_y, max_x, max_y]| {
+            serde_json::json!({
+                "minX": min_x, "minY": min_y, "maxX": max_x, "maxY": max_y
+            })
+        });
+    to_json(&bounds)
 }
 
 #[derive(serde::Deserialize)]
@@ -801,8 +922,58 @@ pub fn os_stream_ops() -> Result<String, String> {
 }
 
 /// The `{ event, payload }` a deferred keyed `os/` call's outcome (`Settled`) fires on its call site, or `null`.
-pub fn os_completion_event(site_json: &str, key: &str, outcome_json: &str) -> Result<String, String> {
+pub fn os_completion_event(
+    site_json: &str,
+    key: &str,
+    outcome_json: &str,
+) -> Result<String, String> {
     orbital_core::embed::os_completion_event_json(site_json, key, outcome_json)
+}
+
+pub fn expand_fx_layer(
+    layer_json: &str,
+    epoch_now_ms: f64,
+    dimension: &str,
+    tile_width: f64,
+) -> Result<String, String> {
+    if !matches!(dimension, "2d" | "3d") || !epoch_now_ms.is_finite() || !tile_width.is_finite() {
+        return Err(
+            "FX projection needs dimension 2d|3d, a finite paint clock and a finite tile width"
+                .into(),
+        );
+    }
+    let layer: serde_json::Value = serde_json::from_str(layer_json).map_err(|e| e.to_string())?;
+    let expanded =
+        orbital_canvas::fx_projection::expand_layer(&layer, epoch_now_ms, dimension, tile_width)
+            .map_err(|e| e.to_string())?;
+    serde_json::to_string(&expanded).map_err(|e| e.to_string())
+}
+
+pub fn resolve_fx_view(item_json: &str, presets_json: Option<&str>) -> Result<String, String> {
+    let item: serde_json::Value = serde_json::from_str(item_json).map_err(|e| e.to_string())?;
+    let presets = presets_json
+        .map(serde_json::from_str::<Vec<serde_json::Value>>)
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    serde_json::to_string(&orbital_canvas::fx_projection::resolve_view(
+        &item,
+        presets.as_deref(),
+    ))
+    .map_err(|e| e.to_string())
+}
+
+pub fn fx_lifecycle(view_json: &str, epoch_now_ms: f64, tick_ms: f64) -> Result<String, String> {
+    if !epoch_now_ms.is_finite() || !tick_ms.is_finite() {
+        return Err("FX lifecycle needs finite clocks".into());
+    }
+    let view: serde_json::Value = serde_json::from_str(view_json).map_err(|e| e.to_string())?;
+    let lifecycle = orbital_canvas::fx_projection::lifecycle_view(&view, epoch_now_ms, tick_ms)
+        .map_err(|e| e.to_string())?;
+    serde_json::to_string(&lifecycle).map_err(|e| e.to_string())
+}
+
+pub fn fx_hash01(seed: &str, salt: u32) -> f64 {
+    orbital_canvas::fx_projection::fx_hash01(seed, salt)
 }
 
 // Expression evaluation and row access: the kernel's one evaluator over JSON strings, for hosts that bind
@@ -881,6 +1052,18 @@ pub fn trace_effects(context_json: &str, effects_json: &str) -> Result<String, S
     orbital_core::embed::eval_wire::trace_effects_json(context_json, effects_json)
 }
 
-pub fn substrate_completion_event(site_json: &str, key: &str, op: &str, args_json: &str, outcome_json: &str) -> Result<String, String> {
-    orbital_core::embed::substrate_completion_event_json(site_json, key, op, args_json, outcome_json)
+pub fn substrate_completion_event(
+    site_json: &str,
+    key: &str,
+    op: &str,
+    args_json: &str,
+    outcome_json: &str,
+) -> Result<String, String> {
+    orbital_core::embed::substrate_completion_event_json(
+        site_json,
+        key,
+        op,
+        args_json,
+        outcome_json,
+    )
 }

@@ -19,12 +19,12 @@ build() {
   # clone of this repo is its own root, so the same settings are passed to the release profile.
   if [ -f ../../../Cargo.toml ] && grep -q '"crates/orbital-wasm"' ../../../Cargo.toml; then
     ROOT="$(cd ../../.. && pwd)"
-    TARGET="$ROOT/target"
+    TARGET="${CARGO_TARGET_DIR:-$ROOT/target}"
     PROFILE=wasm-release
     $CARGO build --manifest-path "$ROOT/Cargo.toml" -p orbital-wasm $FEATURES --target wasm32-unknown-unknown --profile "$PROFILE"
   else
     ROOT="$(cd .. && pwd)"
-    TARGET="$ROOT/target"
+    TARGET="${CARGO_TARGET_DIR:-$ROOT/target}"
     PROFILE=release
     CARGO_PROFILE_RELEASE_OPT_LEVEL=3 CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
       CARGO_PROFILE_RELEASE_STRIP=debuginfo \
