@@ -165,9 +165,10 @@ impl Kernel {
         seeds_json: &str,
         entity_id: Option<String>,
         payload_json: Option<String>,
+        route: Option<String>,
     ) -> Result<String, JsError> {
         self.api
-            .dispatch_mount(seeds_json, entity_id.as_deref(), payload_json.as_deref())
+            .dispatch_mount(seeds_json, entity_id.as_deref(), payload_json.as_deref(), route.as_deref())
             .map_err(js)
     }
 

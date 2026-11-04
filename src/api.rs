@@ -262,6 +262,7 @@ impl KernelApi {
         seeds_json: &str,
         entity_id: Option<&str>,
         payload_json: Option<&str>,
+        route: Option<&str>,
     ) -> Result<String, String> {
         self.record((|| {
             let seeds: Vec<MountSeed> = parse(seeds_json, "seeds_json")?;
@@ -269,7 +270,7 @@ impl KernelApi {
                 Some(s) if !s.is_empty() => parse(s, "payload_json")?,
                 _ => Value::Null,
             };
-            to_json(&self.embedded.dispatch_mount(&seeds, entity_id, payload)?)
+            to_json(&self.embedded.dispatch_route_mount(route, &seeds, entity_id, payload)?)
         })())
     }
 
