@@ -994,7 +994,7 @@ fn event_wires_lists_the_deliveries_between_traits() {
     let wires = parsed(&orbital_wasm::api::event_wires(&paged_schema()).unwrap());
     assert_eq!(
         wires,
-        json!([{ "emitterOrbital": "Main", "emitterTrait": "A", "listenerOrbital": "Main", "listenerTrait": "B", "event": "PING" }])
+        json!([{ "emitterOrbital": "Main", "emitterTrait": "A", "listenerOrbital": "Main", "listenerTrait": "B", "event": "PING", "triggers": "SHOW" }])
     );
 }
 
