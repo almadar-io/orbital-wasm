@@ -39,6 +39,7 @@ impl From<EntryError> for ApiError {
 pub struct KernelApi {
     embedded: EmbeddedKernel,
     last_error: Mutex<String>,
+    trace: std::sync::Arc<orbital_core::runtime::dispatch_trace::TraceFeed>,
 }
 
 fn to_json<T: Serialize>(value: &T) -> Result<String, String> {
@@ -58,9 +59,13 @@ impl KernelApi {
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, ApiError> {
         let schema: OrbitalSchema =
             parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
+        let embedded = EmbeddedKernel::new(schema, client_id)?;
+        let trace = std::sync::Arc::new(orbital_core::runtime::dispatch_trace::TraceFeed::default());
+        embedded.kernel().set_dispatch_observer(Some(std::sync::Arc::new(trace.observer())));
         Ok(Self {
-            embedded: EmbeddedKernel::new(schema, client_id)?,
+            embedded,
             last_error: Mutex::new(String::new()),
+            trace,
         })
     }
 
@@ -359,6 +364,16 @@ impl KernelApi {
     /// The host runs the listeners of every emit it marks `dispatched` (a worklist host).
     pub fn set_host_fans_out(&self, fans_out: bool) {
         self.embedded.set_host_fans_out(fans_out);
+    }
+
+    /// Record each dispatch as a trace item, for the host's `program/live { kind: "trace" }` streams (EXEC-DIST-14).
+    pub fn set_trace_on(&self, on: bool) {
+        self.trace.set_on(on);
+    }
+
+    /// The trace items recorded since the last take, in dispatch order, as a JSON array.
+    pub fn take_trace(&self) -> Result<String, String> {
+        serde_json::to_string(&self.trace.take()).map_err(|e| format!("trace items: {e}"))
     }
 
     /// Carry each hop's `@entity` before and after it on the dispatch's transitions, for a verifier (EXEC-STEP-10).

@@ -252,6 +252,18 @@ impl Kernel {
         self.api.set_host_fans_out(fans_out);
     }
 
+    /// Record each dispatch as a trace item while on, for the host's `program/live { kind: "trace" }` streams.
+    #[wasm_bindgen(js_name = setTraceOn)]
+    pub fn set_trace_on(&self, on: bool) {
+        self.api.set_trace_on(on);
+    }
+
+    /// The trace items recorded since the last take, in dispatch order: a JSON array.
+    #[wasm_bindgen(js_name = takeTrace)]
+    pub fn take_trace(&self) -> Result<String, JsError> {
+        self.api.take_trace().map_err(js)
+    }
+
     /// Carry each hop's `@entity` before and after it on the dispatch's transitions (`observed`), for a verifier
     /// judging `@ensures`. Off by default (EXEC-STEP-10).
     #[wasm_bindgen(js_name = setRecordEntityAfter)]
