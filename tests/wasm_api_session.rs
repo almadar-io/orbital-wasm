@@ -700,6 +700,8 @@ fn greeting_schema() -> String {
     json!({
         "name": "site",
         "typeContractVersion": 1,
+        "locales": ["en", "ar"],
+        "messages": { "en": { "site:hero.title": "Hello" }, "ar": { "site:hero.title": "مرحبا" } },
         "orbitals": [{
             "name": "Home",
             "entity": { "name": "HomeView", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
@@ -717,16 +719,14 @@ fn greeting_schema() -> String {
 }
 
 #[test]
-fn the_client_kernel_paints_i18n_from_the_catalogs_the_host_sets() {
+fn the_client_kernel_paints_the_programs_messages_in_the_viewer_locale() {
     let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
-    kernel
-        .set_messages(r#"["en"]"#, r#"{"en":{"site:hero.title":"Hello"}}"#)
-        .unwrap();
+    kernel.set_viewer_locale(Some("ar".into())).unwrap();
     let wire = parsed(&kernel.dispatch("HomePage", None, "INIT", None).unwrap());
     assert!(
         wire["response"]["clientEffectsByTrait"]
             .to_string()
-            .contains("\"Hello\""),
+            .contains("مرحبا"),
         "{wire:#}"
     );
 }
@@ -822,12 +822,10 @@ fn control_a_server_site_effect_is_never_a_host_ask() {
 }
 
 #[test]
-fn control_a_malformed_catalog_is_refused_by_name() {
+fn control_an_undeclared_viewer_locale_is_refused_by_name() {
     let kernel = KernelApi::new(&greeting_schema(), "c1").unwrap();
-    let err = kernel
-        .set_messages(r#"["en"]"#, r#"{"en":["not","a","map"]}"#)
-        .unwrap_err();
-    assert!(err.contains("catalogs_json"), "{err}");
+    let err = kernel.set_viewer_locale(Some("fr".into())).unwrap_err();
+    assert!(err.contains("\"fr\""), "{err}");
 }
 
 fn visible_schema() -> String {

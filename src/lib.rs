@@ -306,11 +306,10 @@ impl Kernel {
         self.api.leave().map_err(js)
     }
 
-    #[wasm_bindgen(js_name = setMessages)]
-    pub fn set_messages(&self, locales_json: &str, catalogs_json: &str) -> Result<(), JsError> {
-        self.api
-            .set_messages(locales_json, catalogs_json)
-            .map_err(js)
+    /// The page's locale `i18n/t` paints in when a dispatch names none; the program carries its own messages.
+    #[wasm_bindgen(js_name = setViewerLocale)]
+    pub fn set_viewer_locale(&self, locale: Option<String>) -> Result<(), JsError> {
+        self.api.set_viewer_locale(locale).map_err(js)
     }
 
     pub fn mount(&self, traits_json: &str) -> Result<(), JsError> {
@@ -550,13 +549,6 @@ impl Server {
 
     pub fn remount(&self, traits_json: &str) -> Result<(), JsError> {
         self.api.remount(traits_json).map_err(js)
-    }
-
-    #[wasm_bindgen(js_name = setMessages)]
-    pub fn set_messages(&self, locales_json: &str, catalogs_json: &str) -> Result<(), JsError> {
-        self.api
-            .set_messages(locales_json, catalogs_json)
-            .map_err(js)
     }
 
     #[wasm_bindgen(js_name = setCapabilities)]

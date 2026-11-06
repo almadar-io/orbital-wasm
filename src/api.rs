@@ -431,12 +431,9 @@ impl KernelApi {
         self.record(to_json(&self.embedded.leave()))
     }
 
-    /// The viewer's locales (`string[]`, the first is painted) and their catalogs (`{ [locale]: { [key]: text } }`), as JSON.
-    pub fn set_messages(&self, locales_json: &str, catalogs_json: &str) -> Result<(), String> {
-        self.record(parse::<Vec<String>>(locales_json, "locales_json").and_then(|locales| {
-            parse::<std::collections::HashMap<String, std::collections::HashMap<String, String>>>(catalogs_json, "catalogs_json")
-                .map(|catalogs| self.embedded.set_messages(locales, catalogs))
-        }))
+    /// The page's locale `i18n/t` paints in when a dispatch names none (`None`: the program's first declared).
+    pub fn set_viewer_locale(&self, locale: Option<String>) -> Result<(), String> {
+        self.record(self.embedded.set_viewer_locale(locale).map_err(|e| e.to_string()))
     }
 
     pub fn mount(&self, traits_json: &str) -> Result<(), String> {
@@ -660,19 +657,6 @@ impl ServerApi {
     pub fn remount(&self, traits_json: &str) -> Result<(), String> {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json").map(|t| self.embedded.remount(t)),
-        )
-    }
-
-    /// The program's declared locales (`string[]`) and merged catalogs (`{ [locale]: { [key]: text } }`), as JSON.
-    pub fn set_messages(&self, locales_json: &str, catalogs_json: &str) -> Result<(), String> {
-        self.record(
-            parse::<Vec<String>>(locales_json, "locales_json").and_then(|locales| {
-                parse::<std::collections::HashMap<String, std::collections::HashMap<String, String>>>(
-                    catalogs_json,
-                    "catalogs_json",
-                )
-                .map(|catalogs| self.embedded.set_messages(locales, catalogs))
-            }),
         )
     }
 

@@ -122,18 +122,16 @@ test('a stateful server refuses carried circuit state outside a delegated leg, a
   const carried = JSON.parse(server.start('Board', JSON.stringify({ event: 'GO', traits: [{ trait: 'Scoped', from: 'idle' }] })));
   assert.equal(carried.response.success, false);
   assert.equal(carried.response.rejections[0].code, 'client-circuit-state-refused');
-  server.setMessages('["en","ar"]', '{}');
-  const locale = JSON.parse(server.start('Board', JSON.stringify({ event: 'GO', targetTrait: 'Scoped', locale: 'fr' })));
+  const declared = new Server(JSON.stringify({ ...JSON.parse(tickSchema), locales: ['en', 'ar'] }));
+  const locale = JSON.parse(declared.start('Board', JSON.stringify({ event: 'GO', targetTrait: 'Scoped', locale: 'fr' })));
   assert.equal(locale.response.rejections[0].code, 'locale-not-declared');
 });
 
-test('the program messages are set by JSON and picked by the request locale', async () => {
-  const server = new Server(tickSchema);
+test('the messages the program carries are picked by the request locale', async () => {
+  const server = new Server(JSON.stringify({ ...JSON.parse(tickSchema), locales: ['en', 'ar'], messages: { en: { k: 'Hello' }, ar: { k: 'مرحبا' } } }));
   server.mountClient('tab-1', 'Board', '["Scoped"]');
-  server.setMessages('["en","ar"]', JSON.stringify({ en: { k: 'Hello' }, ar: { k: 'مرحبا' } }));
   const ar = await drive(server, 'Board', { ...tick, locale: 'ar' }, []);
   assert.match(JSON.stringify(ar.clientEffectsByTrait), /مرحبا/);
   const en = await drive(server, 'Board', { ...tick, locale: 'en' }, []);
   assert.match(JSON.stringify(en.clientEffectsByTrait), /Hello/);
-  assert.throws(() => server.setMessages('{', '{}'), /locales_json/);
 });
