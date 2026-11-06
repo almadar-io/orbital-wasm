@@ -55,8 +55,9 @@ impl SceneCanvas {
         self.inner.input(kind, x, y, button);
     }
 
-    pub fn zoom(&mut self, factor: f32, x: f32, y: f32) {
-        self.inner.zoom(factor, x, y);
+    /// Whether the scene took the zoom; the page scrolls when it did not.
+    pub fn zoom(&mut self, factor: f32, x: f32, y: f32) -> bool {
+        self.inner.zoom(factor, x, y)
     }
 
     #[wasm_bindgen(js_name = doubleTap)]
