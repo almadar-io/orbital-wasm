@@ -30,7 +30,55 @@ fn js(error: impl std::fmt::Display) -> JsError {
 
 #[wasm_bindgen]
 pub struct Kernel {
-    api: KernelApi,
+    api: std::rc::Rc<KernelApi>,
+    /// The GPU answerer the host installed and where each held ask's completion goes (`installGpu`).
+    gpu: std::cell::RefCell<Option<(std::rc::Rc<orbital_canvas::GpuHost>, js_sys::Function)>>,
+    /// Whether a drain of the held `gpu/` asks is running.
+    draining: std::rc::Rc<std::cell::Cell<bool>>,
+}
+
+impl Kernel {
+    /// Start answering the held `gpu/` asks, one at a time in ask order, unless a drain is already running.
+    fn pump(&self) {
+        let Some((gpu, on_completion)) = self.gpu.borrow().clone() else {
+            return;
+        };
+        if self.draining.get() {
+            return;
+        }
+        self.draining.set(true);
+        wasm_bindgen_futures::spawn_local(drain_client_gpu(self.api.clone(), gpu, on_completion, self.draining.clone()));
+    }
+
+    fn pumped<T>(&self, out: T) -> T {
+        self.pump();
+        out
+    }
+}
+
+/// Answer the client kernel's held `gpu/` asks in ask order until none is left (EXEC-GPU-5). Each outcome's route event
+/// is handed to `on_completion` as `{ orbital?, traitName, entityId?, event, heldPayload }` for the host to dispatch with
+/// `dispatchHeld`, or `null` when the outcome takes no declared route.
+async fn drain_client_gpu(
+    api: std::rc::Rc<KernelApi>,
+    gpu: std::rc::Rc<orbital_canvas::GpuHost>,
+    on_completion: js_sys::Function,
+    draining: std::rc::Rc<std::cell::Cell<bool>>,
+) {
+    while let Some(ask) = api.embedded().take_gpu_ask() {
+        let outcome = gpu.answer_async(ask.op, &ask.args).await;
+        let done = api.embedded().gpu_completion(&ask, outcome);
+        let delivered = orbital_core::js_readable::to_js_readable_json(&done)
+            .map_err(|e| JsValue::from_str(&e))
+            .and_then(|json| on_completion.call1(&JsValue::NULL, &JsValue::from_str(&json)));
+        if let Err(error) = delivered {
+            if let Some(done) = &done {
+                api.embedded().drop_held_payload(done.held_payload);
+            }
+            console_error(&format!("{}: the completion could not be delivered: {error:?}", ask.op.name()));
+        }
+    }
+    draining.set(false);
 }
 
 #[wasm_bindgen]
@@ -38,8 +86,41 @@ impl Kernel {
     #[wasm_bindgen(constructor)]
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Kernel, JsError> {
         KernelApi::new(resolved_schema_json, client_id)
-            .map(|api| Kernel { api })
+            .map(|api| Kernel {
+                api: std::rc::Rc::new(api),
+                gpu: std::cell::RefCell::new(None),
+                draining: std::rc::Rc::new(std::cell::Cell::new(false)),
+            })
             .map_err(js)
+    }
+
+    /// Install the GPU answerer: from now on every `gpu/` ask is held in the kernel and answered here in ask order, and
+    /// each outcome's route event is handed to `onCompletion` (see [`drain_client_gpu`]) for the host to dispatch with
+    /// `dispatchHeld`, so no handle or byte crosses to JavaScript.
+    #[wasm_bindgen(js_name = installGpu)]
+    pub fn install_gpu(&self, gpu: &gpu::GpuHost, on_completion: js_sys::Function) {
+        *self.gpu.borrow_mut() = Some((gpu.inner.clone(), on_completion));
+        self.api.embedded().hold_gpu();
+        self.pump();
+    }
+
+    /// Dispatch a held completion: `event` on `traitName` with the payload held under `heldPayload`, taken once.
+    #[wasm_bindgen(js_name = dispatchHeld)]
+    pub fn dispatch_held(
+        &self,
+        trait_name: &str,
+        entity_id: Option<String>,
+        event: &str,
+        held_payload: f64,
+    ) -> Result<String, JsError> {
+        let ticket = flight_id(held_payload)?;
+        self.pumped(self.api.dispatch_held(trait_name, entity_id.as_deref(), event, ticket).map_err(js))
+    }
+
+    /// Drop a held completion payload no dispatch will take (the host could not deliver it).
+    #[wasm_bindgen(js_name = dropHeldPayload)]
+    pub fn drop_held_payload(&self, held_payload: f64) -> Result<bool, JsError> {
+        Ok(self.api.embedded().drop_held_payload(flight_id(held_payload)?))
     }
 
     pub fn dispatch(
@@ -49,14 +130,14 @@ impl Kernel {
         event: &str,
         payload_json: Option<String>,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .dispatch(
                 trait_name,
                 entity_id.as_deref(),
                 event,
                 payload_json.as_deref(),
             )
-            .map_err(js)
+            .map_err(js))
     }
 
     #[wasm_bindgen(js_name = applyServerResponse)]
@@ -66,13 +147,13 @@ impl Kernel {
         already_delivered_json: Option<String>,
         base_json: Option<String>,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .apply_server_response(
                 response_json,
                 already_delivered_json.as_deref(),
                 base_json.as_deref(),
             )
-            .map_err(js)
+            .map_err(js))
     }
 
     #[wasm_bindgen(js_name = openFlight)]
@@ -88,14 +169,14 @@ impl Kernel {
         already_delivered_json: Option<String>,
         base_json: Option<String>,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .fold_in_order(
                 flight as u64,
                 response_json,
                 already_delivered_json.as_deref(),
                 base_json.as_deref(),
             )
-            .map_err(js)
+            .map_err(js))
     }
 
     #[wasm_bindgen(js_name = deliverEmitToListeners)]
@@ -104,21 +185,21 @@ impl Kernel {
         flight: f64,
         emitted_json: &str,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .deliver_emit_to_listeners(flight as u64, emitted_json)
-            .map_err(js)
+            .map_err(js))
     }
 
     #[wasm_bindgen(js_name = deliverOriginEmit)]
     pub fn deliver_origin_emit(&self, flight: f64, emitted_json: &str) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .deliver_origin_emit(flight as u64, emitted_json)
-            .map_err(js)
+            .map_err(js))
     }
 
     #[wasm_bindgen(js_name = nextFold)]
     pub fn next_fold(&self) -> Result<Option<String>, JsError> {
-        self.api.next_fold().map_err(js)
+        self.pumped(self.api.next_fold().map_err(js))
     }
 
     #[wasm_bindgen(js_name = endFlight)]
@@ -168,9 +249,9 @@ impl Kernel {
         payload_json: Option<String>,
         route: Option<String>,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .dispatch_mount(seeds_json, entity_id.as_deref(), payload_json.as_deref(), route.as_deref())
-            .map_err(js)
+            .map_err(js))
     }
 
     pub fn restore(
@@ -179,9 +260,9 @@ impl Kernel {
         entity_id: Option<String>,
         snapshot_json: &str,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .restore(trait_name, entity_id.as_deref(), snapshot_json)
-            .map_err(js)
+            .map_err(js))
     }
 
     pub fn tick(
@@ -190,14 +271,14 @@ impl Kernel {
         tick_name: &str,
         entity_id: Option<String>,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .tick(trait_name, tick_name, entity_id.as_deref())
-            .map_err(js)
+            .map_err(js))
     }
 
     /// `undefined` when no tick is due this frame.
     pub fn frame(&self, now_ms: f64) -> Result<Option<String>, JsError> {
-        self.api.frame(now_ms as u64).map_err(js)
+        self.pumped(self.api.frame(now_ms as u64).map_err(js))
     }
 
     #[wasm_bindgen(js_name = framePause)]
@@ -289,7 +370,7 @@ impl Kernel {
     }
 
     pub fn remount(&self, traits_json: &str) -> Result<String, JsError> {
-        self.api.remount(traits_json).map_err(js)
+        self.pumped(self.api.remount(traits_json).map_err(js))
     }
 
     pub fn enter(
@@ -298,9 +379,9 @@ impl Kernel {
         mount_key: &str,
         traits_json: &str,
     ) -> Result<String, JsError> {
-        self.api
+        self.pumped(self.api
             .enter(route_path.as_deref(), mount_key, traits_json)
-            .map_err(js)
+            .map_err(js))
     }
 
     pub fn leave(&self) -> Result<String, JsError> {

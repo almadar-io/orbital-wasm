@@ -76,6 +76,24 @@ impl KernelApi {
         result
     }
 
+    pub fn embedded(&self) -> &EmbeddedKernel {
+        &self.embedded
+    }
+
+    /// [`Self::dispatch`] with the payload the kernel holds under `ticket` (a gpu completion's).
+    pub fn dispatch_held(
+        &self,
+        trait_name: &str,
+        entity_id: Option<&str>,
+        event: &str,
+        ticket: u64,
+    ) -> Result<String, String> {
+        self.record((|| {
+            self.embedded.owning_orbital(trait_name)?;
+            to_json(&self.embedded.dispatch_held(trait_name, entity_id, event, ticket)?)
+        })())
+    }
+
     fn set_last_error(&self, message: String) {
         if let Ok(mut slot) = self.last_error.lock() {
             *slot = message;
