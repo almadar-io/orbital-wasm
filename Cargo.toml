@@ -26,6 +26,9 @@ wasm-bindgen-futures = "=0.4.76"
 js-sys = "=0.3.103"
 serde = { version = "1.0", features = ["derive"] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "=0.3.103", features = ["HtmlCanvasElement"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 orbital-core = { git = "https://github.com/almadar-io/orbital-core", branch = "main", default-features = false }
 orbital-canvas = { git = "https://github.com/almadar-io/orbital-canvas", branch = "main", default-features = false }

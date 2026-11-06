@@ -5,6 +5,8 @@
 //! `last_error`.
 
 pub mod api;
+#[cfg(target_arch = "wasm32")]
+pub mod canvas3d;
 pub mod credentials;
 pub mod gpu;
 pub mod stored;
