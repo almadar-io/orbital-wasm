@@ -6,6 +6,7 @@
 
 pub mod api;
 pub mod credentials;
+pub mod gpu;
 pub mod stored;
 
 use api::{KernelApi, ServerApi};
