@@ -7,6 +7,8 @@
 pub mod api;
 #[cfg(target_arch = "wasm32")]
 pub mod canvas3d;
+#[cfg(target_arch = "wasm32")]
+pub mod scene_canvas;
 pub mod credentials;
 pub mod gpu;
 pub mod stored;
