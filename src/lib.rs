@@ -362,7 +362,55 @@ impl Kernel {
 /// The server role: `start` a request, answer the I/O it asks for, `resume` the flight until it is done.
 #[wasm_bindgen]
 pub struct Server {
-    api: ServerApi,
+    api: std::rc::Rc<ServerApi>,
+    /// The GPU answerer the host installed (`installGpu`): the server then holds every `gpu/` ask for it.
+    gpu: std::cell::RefCell<Option<std::rc::Rc<orbital_canvas::GpuHost>>>,
+}
+
+impl Server {
+    fn of(api: ServerApi, gpu: Option<std::rc::Rc<orbital_canvas::GpuHost>>) -> Server {
+        if gpu.is_some() {
+            api.embedded().hold_gpu();
+        }
+        Server { api: std::rc::Rc::new(api), gpu: std::cell::RefCell::new(gpu) }
+    }
+}
+
+/// Answer the held `gpu/` ask `ticket` with the installed answerer. A deferring ask under a route runs in the
+/// background and answers `serviceDeferred`; its completion is held in the server and handed to `on_completion` as
+/// `{ orbital?, traitName, entityId?, event, heldPayload }`, or `null` when the outcome takes no declared route. Any other ask answers `gpuHeld` with the ticket its
+/// outcome is held under.
+async fn answer_held(
+    api: std::rc::Rc<ServerApi>,
+    gpu: std::rc::Rc<orbital_canvas::GpuHost>,
+    ticket: u64,
+    on_completion: js_sys::Function,
+) -> orbital_core::embed::wire::IoAnswerWire {
+    use orbital_core::embed::wire::{IoAnswerWire, Settled};
+    use orbital_core::runtime::os::{OsError, OsErrorKind};
+    let Some(ask) = api.embedded().take_gpu_ask(ticket) else {
+        let missing: Result<orbital_core::Value, OsError> =
+            Err(OsError::new(OsErrorKind::Invalid, format!("no gpu ask is held as {ticket}")));
+        return IoAnswerWire::Os { result: Settled::from(missing) };
+    };
+    if ask.op.defers_completion() && ask.key.is_some() && ask.site.is_some() {
+        wasm_bindgen_futures::spawn_local(async move {
+            let outcome = gpu.answer_async(ask.op, &ask.args).await;
+            let done = api.embedded().gpu_completion(&ask, outcome);
+            let delivered = orbital_core::js_readable::to_js_readable_json(&done)
+                .map_err(|e| JsValue::from_str(&e))
+                .and_then(|json| on_completion.call1(&JsValue::NULL, &JsValue::from_str(&json)));
+            if let Err(error) = delivered {
+                if let Some(done) = &done {
+                    api.embedded().drop_held_payload(done.held_payload);
+                }
+                console_error(&format!("{}: the completion could not be delivered: {error:?}", ask.op.name()));
+            }
+        });
+        return IoAnswerWire::ServiceDeferred;
+    }
+    let outcome = gpu.answer_async(ask.op, &ask.args).await;
+    IoAnswerWire::GpuHeld { ticket: api.embedded().hold_gpu_answer(outcome) }
 }
 
 fn flight_id(flight: f64) -> Result<u64, JsError> {
@@ -382,22 +430,56 @@ impl Server {
     #[wasm_bindgen(constructor)]
     pub fn new(resolved_schema_json: &str) -> Result<Server, JsError> {
         ServerApi::new(resolved_schema_json)
-            .map(|api| Server { api })
+            .map(|api| Server::of(api, None))
             .map_err(js)
     }
 
     /// A server holding this one's registered program and none of its session: what a stateless host serves
     /// each request from, instead of registering the program again.
     pub fn fork(&self) -> Result<Server, JsError> {
-        self.api.fork().map(|api| Server { api }).map_err(js)
+        let gpu = self.gpu.borrow().clone();
+        self.api.fork().map(|api| Server::of(api, gpu)).map_err(js)
     }
 
     #[wasm_bindgen(js_name = forkProgram)]
     pub fn fork_program(&self, program_json: &str) -> Result<Server, JsError> {
         self.api
             .fork_program(program_json)
-            .map(|api| Server { api })
+            .map(|api| Server::of(api, self.gpu.borrow().clone()))
             .map_err(js)
+    }
+
+    /// Install the GPU answerer: from now on the server holds every `gpu/` ask, and the host answers it by ticket
+    /// with `answerGpu`, so no argument or answer crosses to JavaScript.
+    #[wasm_bindgen(js_name = installGpu)]
+    pub fn install_gpu(&self, gpu: &gpu::GpuHost) {
+        *self.gpu.borrow_mut() = Some(gpu.inner.clone());
+        self.api.embedded().hold_gpu();
+    }
+
+    /// Answer the held `gpu/` ask `ticket` (an `IoRequestWire` of kind `gpu`): resolves to the `IoAnswerWire` JSON to
+    /// reply with. A deferred completion is handed to `onCompletion` (see [`answer_held`]).
+    #[wasm_bindgen(js_name = answerGpu)]
+    pub fn answer_gpu(&self, ticket: f64, on_completion: js_sys::Function) -> Result<js_sys::Promise, JsError> {
+        let ticket = flight_id(ticket)?;
+        let gpu = self
+            .gpu
+            .borrow()
+            .clone()
+            .ok_or_else(|| JsError::new("answerGpu: no gpu answerer is installed"))?;
+        let api = self.api.clone();
+        Ok(wasm_bindgen_futures::future_to_promise(async move {
+            let answer = answer_held(api, gpu, ticket, on_completion).await;
+            orbital_core::js_readable::to_js_readable_json(&answer)
+                .map(|json| JsValue::from_str(&json))
+                .map_err(|e| JsValue::from_str(&e))
+        }))
+    }
+
+    /// Drop a held completion payload the host will not start (its call was cancelled).
+    #[wasm_bindgen(js_name = dropHeldPayload)]
+    pub fn drop_held_payload(&self, ticket: f64) -> Result<bool, JsError> {
+        Ok(self.api.embedded().drop_held_payload(flight_id(ticket)?))
     }
 
     #[wasm_bindgen(js_name = osAllows)]

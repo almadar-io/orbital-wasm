@@ -309,9 +309,9 @@ fn the_installed_language_exports_as_a_bundle_a_host_without_node_modules_instal
     install_language(&bundle).unwrap();
 
     let mut tampered = value.clone();
-    tampered["core"]["compiler"] = json!("=0.0.1");
+    tampered["std"][orbital_core::language_data::LANGUAGE_RANGE_FIELD] = json!("^99");
     let err = install_language(&tampered.to_string()).unwrap_err();
-    assert!(err.starts_with("ORB_LANGUAGE_DATA_INCOMPATIBLE"), "control: a bundle for another orb is refused: {err}");
+    assert!(err.starts_with("ORB_LANGUAGE_DATA_INCOMPATIBLE"), "control: a std bundle for another language is refused: {err}");
 }
 
 #[test]
