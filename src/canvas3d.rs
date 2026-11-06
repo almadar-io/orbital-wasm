@@ -52,9 +52,9 @@ impl Canvas3D {
         self.inner.render().map_err(|e| JsError::new(&e))
     }
 
-    /// Advances damping; true while the camera still moves.
-    pub fn frame(&mut self) -> bool {
-        self.inner.frame()
+    /// Advances the canvas clock to `now_ms` (`performance.now()`) and camera damping; true when the frame changed.
+    pub fn frame(&mut self, now_ms: f64) -> Result<bool, JsError> {
+        self.inner.frame(now_ms).map_err(|e| JsError::new(&e))
     }
 
     #[wasm_bindgen(js_name = pointerDown)]
@@ -87,6 +87,11 @@ impl Canvas3D {
             }
             None => "null".into(),
         }
+    }
+
+    /// False when this canvas runs on the WebGL2 fallback (no GPU drawables there).
+    pub fn webgpu(&self) -> bool {
+        self.inner.webgpu()
     }
 
     pub fn wheel(&mut self, delta_y: f32) -> bool {
