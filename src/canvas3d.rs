@@ -29,12 +29,17 @@ impl Canvas3D {
         Ok(Canvas3D { inner })
     }
 
-    /// `node_json`: the 3D render node; `theme_json`: the page's resolved scene theme.
+    /// `node_json`: the 3D render node; `theme_json`: the page's resolved canvas theme, or `null` for none.
     #[wasm_bindgen(js_name = setScene)]
     pub fn set_scene(&mut self, node_json: &str, theme_json: &str) -> Result<(), JsError> {
+        use orbital_canvas::mappers::canvas_scene3d::SceneTheme;
         let node: serde_json::Value = serde_json::from_str(node_json).map_err(|e| JsError::new(&format!("node_json: {e}")))?;
-        let theme: orbital_canvas::mappers::canvas_scene3d::SceneTheme =
+        let theme: serde_json::Value =
             serde_json::from_str(theme_json).map_err(|e| JsError::new(&format!("theme_json: {e}")))?;
+        let theme = match theme {
+            serde_json::Value::Null => SceneTheme::default(),
+            theme => SceneTheme::from_canvas_theme(&theme).map_err(|e| JsError::new(&e.to_string()))?,
+        };
         self.inner.set_scene(&node, &theme).map_err(|e| JsError::new(&e))
     }
 
