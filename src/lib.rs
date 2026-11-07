@@ -684,6 +684,16 @@ impl Server {
         self.api.boot_mounts(side).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = browserCompletionPayload)]
+    pub fn browser_completion_payload(&self, trait_name: &str, payload_json: &str) -> Result<String, JsError> {
+        self.api.browser_completion_payload(trait_name, payload_json).map_err(js)
+    }
+
+    #[wasm_bindgen(js_name = clientView)]
+    pub fn client_view(&self, response_json: &str) -> Result<String, JsError> {
+        self.api.client_view(response_json).map_err(js)
+    }
+
     #[wasm_bindgen(js_name = routeMounts)]
     pub fn route_mounts(&self, route_path: &str) -> Result<String, JsError> {
         self.api.route_mounts(route_path).map_err(js)

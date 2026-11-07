@@ -511,3 +511,67 @@ fn control_the_same_lambda_program_runs_with_the_language_installed() {
     assert_eq!(step["status"], "done", "{step:#}");
     assert_eq!(api.get_state("Pick", None), "picked");
 }
+
+fn handoff_program() -> Value {
+    let machine = |arms: Value| json!({ "states": [{ "name": "idle", "isInitial": true }], "transitions": arms });
+    json!({
+        "name": "App",
+        "typeContractVersion": 1,
+        "orbitals": [{
+            "name": "Main",
+            "entity": { "name": "Job", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [
+                { "name": "Source", "linkedEntity": "Job", "emits": [{ "event": "OUTSIDE", "scope": "external" }],
+                  "stateMachine": machine(json!([{ "from": "idle", "to": "idle", "event": "GO", "effects": [
+                      ["emit", "HANDOFF", { "blob": "server-only-payload" }],
+                      ["emit", "PAINT", { "label": "for-the-client" }],
+                      ["emit", "OUTSIDE", {}]] }])) },
+                { "name": "Sink", "linkedEntity": "Job",
+                  "listens": [{ "event": "HANDOFF", "triggers": "TAKE", "source": { "kind": "trait", "trait": "Source" } }],
+                  "stateMachine": machine(json!([{ "from": "idle", "to": "idle", "event": "TAKE", "effects": [] }])) },
+                { "name": "Painter", "linkedEntity": "Job", "dispatch": "client",
+                  "listens": [{ "event": "PAINT", "triggers": "SHOW", "source": { "kind": "trait", "trait": "Source" } }],
+                  "stateMachine": machine(json!([{ "from": "idle", "to": "idle", "event": "SHOW", "effects": [] }])) }
+            ]
+        }]
+    })
+}
+
+fn emitted_by(api: &ServerApi, view: bool) -> Vec<String> {
+    let step = progress(&api.start("Main", &json!({ "event": "GO", "targetTrait": "Source" }).to_string()).unwrap());
+    assert_eq!(step["status"], "done", "{step:#}");
+    let response = if view {
+        progress(&api.client_view(&step["response"].to_string()).unwrap())
+    } else {
+        step["response"].clone()
+    };
+    response["emittedEvents"].as_array().unwrap().iter().map(|e| e["event"].as_str().unwrap().to_string()).collect()
+}
+
+#[test]
+fn g_orbital_shell_typescript_143_client_view_drops_an_emit_only_server_traits_listen_to() {
+    let api = ServerApi::new(&handoff_program().to_string()).unwrap();
+    let names = emitted_by(&api, true);
+    assert!(!names.contains(&"HANDOFF".to_string()), "{names:?}");
+    assert!(names.contains(&"PAINT".to_string()) && names.contains(&"OUTSIDE".to_string()), "{names:?}");
+}
+
+#[test]
+fn control_the_full_response_keeps_the_server_only_emit_and_a_bad_response_is_refused() {
+    let api = ServerApi::new(&handoff_program().to_string()).unwrap();
+    assert!(emitted_by(&api, false).contains(&"HANDOFF".to_string()));
+    let err = api.client_view("{not json").unwrap_err();
+    assert_eq!(api.last_error(), err);
+}
+
+#[test]
+fn g_orbital_shell_typescript_143_a_server_trait_completion_carries_no_payload_to_the_browser() {
+    let api = ServerApi::new(&handoff_program().to_string()).unwrap();
+    assert_eq!(progress(&api.browser_completion_payload("Source", r#"{"text":"big"}"#).unwrap()), Value::Null);
+}
+
+#[test]
+fn control_a_client_trait_completion_keeps_its_payload() {
+    let api = ServerApi::new(&handoff_program().to_string()).unwrap();
+    assert_eq!(progress(&api.browser_completion_payload("Painter", r#"{"text":"big"}"#).unwrap()), json!({ "text": "big" }));
+}

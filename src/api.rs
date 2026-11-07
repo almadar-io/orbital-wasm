@@ -696,6 +696,24 @@ impl ServerApi {
         self.record(side_of(side).and_then(|side| to_json(&self.embedded.boot_mounts(side))))
     }
 
+    /// The payload a deferred completion's push carries to the browser (EXEC-QUEUE-10), as JSON.
+    pub fn browser_completion_payload(&self, trait_name: &str, payload_json: &str) -> Result<String, String> {
+        self.record(
+            parse::<orbital_core::Value>(payload_json, "payload_json")
+                .map(|payload| self.embedded.kernel().browser_completion_payload(trait_name, &payload))
+                .and_then(|shaped| to_json(&shaped)),
+        )
+    }
+
+    /// What a browser is told of `response_json` (an `EventResponse`): the kernel's client view (EXEC-DIST-8), as JSON.
+    pub fn client_view(&self, response_json: &str) -> Result<String, String> {
+        self.record(
+            parse::<EventResponse>(response_json, "response_json")
+                .map(|response| self.embedded.kernel().client_view(response))
+                .and_then(|view| to_json(&view)),
+        )
+    }
+
     /// The kernel's mounts for a client opening `route_path`, `MountSeed[]` as JSON.
     pub fn route_mounts(&self, route_path: &str) -> Result<String, String> {
         self.record(to_json(&self.embedded.route_mounts(route_path)))
