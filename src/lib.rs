@@ -252,9 +252,10 @@ impl Kernel {
         entity_id: Option<String>,
         payload_json: Option<String>,
         route: Option<String>,
+        crumb: Option<String>,
     ) -> Result<String, JsError> {
         self.pumped(self.api
-            .dispatch_mount(seeds_json, entity_id.as_deref(), payload_json.as_deref(), route.as_deref())
+            .dispatch_mount(seeds_json, entity_id.as_deref(), payload_json.as_deref(), route.as_deref(), crumb.as_deref())
             .map_err(js))
     }
 
