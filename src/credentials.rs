@@ -196,6 +196,7 @@ impl VaultApi {
 
     fn exchange_json(&self, pending: PendingExchange) -> Result<Value, String> {
         let PendingExchange {
+            kind,
             endpoint,
             headers,
             body,
@@ -212,7 +213,7 @@ impl VaultApi {
             .into_iter()
             .map(|(name, value)| json!([name, value]))
             .collect();
-        Ok(json!({ "endpoint": endpoint, "headers": headers, "body": body, "ticket": handle }))
+        Ok(json!({ "kind": kind, "endpoint": endpoint, "headers": headers, "body": body, "ticket": handle }))
     }
 
     fn settled<T: serde::Serialize>(result: Result<T, ConnectFailure>) -> Result<String, String> {
@@ -229,7 +230,7 @@ impl VaultApi {
     }
 
     /// The request to send for a `credentialConnect` grant (the wire JSON the kernel asked with) and the handle to finish it
-    /// with: `{ ok: { endpoint, headers: [[name, value]], body, ticket } }` or `{ error: { kind, message } }`. Nothing is
+    /// with: `{ ok: { kind: "form" | "metadata", endpoint, headers: [[name, value]], body, ticket } }` or `{ error: { kind, message } }`. Nothing is
     /// persisted until [`Self::connect_finish`].
     pub fn connect_begin(&self, grant_json: &str) -> Result<String, String> {
         let wire: CredentialGrantWire =
