@@ -706,6 +706,11 @@ impl ServerApi {
         )
     }
 
+    /// Whether a browser runs `trait_name` (EXEC-STORE-4, EXEC-DIST-9); a host pushes no dispatch of one it does not.
+    pub fn browser_runs(&self, trait_name: &str) -> bool {
+        self.embedded.kernel().browser_runs(trait_name)
+    }
+
     /// What a browser is told of `response_json` (an `EventResponse`): the kernel's client view (EXEC-DIST-8), as JSON.
     pub fn client_view(&self, response_json: &str) -> Result<String, String> {
         self.record(

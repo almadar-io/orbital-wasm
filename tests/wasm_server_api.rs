@@ -570,6 +570,36 @@ fn g_orbital_shell_typescript_143_a_server_trait_completion_carries_no_payload_t
     assert_eq!(progress(&api.browser_completion_payload("Source", r#"{"text":"big"}"#).unwrap()), Value::Null);
 }
 
+fn store_driver_program() -> Value {
+    let machine = json!({ "states": [{ "name": "idle", "isInitial": true }], "transitions": [] });
+    json!({
+        "name": "App",
+        "typeContractVersion": 1,
+        "orbitals": [{
+            "name": "Main",
+            "entity": { "name": "Note", "persistence": "persistent", "store": "Rows", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [{ "name": "Viewer", "linkedEntity": "Note", "dispatch": "client", "stateMachine": machine }],
+            "pages": [{ "name": "Home", "path": "/", "traits": [{ "ref": "Viewer" }] }]
+        }, {
+            "name": "Rows",
+            "entity": { "name": "RowsRun", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [{ "name": "RowsDriver", "linkedEntity": "RowsRun", "stateMachine": machine }]
+        }]
+    })
+}
+
+#[test]
+fn a_store_driver_orbitals_trait_is_not_browser_run() {
+    let api = ServerApi::new(&store_driver_program().to_string()).unwrap();
+    assert!(!api.browser_runs("RowsDriver"));
+}
+
+#[test]
+fn control_a_client_trait_is_browser_run() {
+    let api = ServerApi::new(&store_driver_program().to_string()).unwrap();
+    assert!(api.browser_runs("Viewer"));
+}
+
 #[test]
 fn control_a_client_trait_completion_keeps_its_payload() {
     let api = ServerApi::new(&handoff_program().to_string()).unwrap();

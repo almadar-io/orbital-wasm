@@ -685,6 +685,11 @@ impl Server {
         self.api.boot_mounts(side).map_err(js)
     }
 
+    #[wasm_bindgen(js_name = browserRuns)]
+    pub fn browser_runs(&self, trait_name: &str) -> bool {
+        self.api.browser_runs(trait_name)
+    }
+
     #[wasm_bindgen(js_name = browserCompletionPayload)]
     pub fn browser_completion_payload(&self, trait_name: &str, payload_json: &str) -> Result<String, JsError> {
         self.api.browser_completion_payload(trait_name, payload_json).map_err(js)
