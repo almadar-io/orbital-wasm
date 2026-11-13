@@ -56,6 +56,19 @@ impl SceneCanvas {
         self.inner.input(kind, x, y, button);
     }
 
+    /// [`Self::input`] from one of several pointers (`PointerEvent.pointerId`): a further finger reaches the
+    /// region that holds capture, and a multi-touch gesture's events carry `touches`.
+    #[wasm_bindgen(js_name = inputPointer)]
+    pub fn input_pointer(&mut self, kind: &str, x: f32, y: f32, button: i32, pointer_id: i32) {
+        self.inner.input_pointer(kind, x, y, button, pointer_id);
+    }
+
+    /// The wheel at a point in CSS pixels with its pixel deltas; true when the canvas declares `wheelEvent`
+    /// (the page must not take the wheel).
+    pub fn wheel(&mut self, x: f32, y: f32, dx: f32, dy: f32) -> bool {
+        self.inner.wheel(x, y, dx, dy)
+    }
+
     /// Whether the scene took the zoom; the page scrolls when it did not.
     pub fn zoom(&mut self, factor: f32, x: f32, y: f32) -> bool {
         self.inner.zoom(factor, x, y)
