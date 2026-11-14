@@ -33,8 +33,14 @@ function run(script) {
     }
     return null;
   };
-  const json = (text) => JSON.parse(text);
+  const held = new Map();
+  const json = (text) => resolveHeld(JSON.parse(text), held);
   return script.steps.map((s) => {
+    const answer = step(s);
+    for (const id of JSON.parse(kernel.heldReleased())) held.delete(id);
+    return answer;
+  });
+  function step(s) {
     const entity = s.entityId ?? undefined;
     const text = (v) => JSON.stringify(v);
     switch (s.op) {
@@ -83,7 +89,23 @@ function run(script) {
       default:
         throw new Error(`unknown op ${s.op}`);
     }
-  });
+  }
+}
+
+/** The answer as the host reads it: each held leaf replaced by the value it names (EXEC-DIST-16). */
+function resolveHeld(v, held) {
+  if (Array.isArray(v)) return v.map((x) => resolveHeld(x, held));
+  if (v === null || typeof v !== 'object') return v;
+  if (typeof v.$held === 'number') {
+    if (v.value === undefined) {
+      assert.ok(held.has(v.$held), `held value ${v.$held} was handed to this host and not released`);
+      return held.get(v.$held);
+    }
+    const full = resolveHeld(v.value, held);
+    held.set(v.$held, full);
+    return full;
+  }
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, resolveHeld(x, held)]));
 }
 
 for (const name of ['basic-entity', 'tick-counter', 'entity-rerender', 'rollback', 'two-orbital-chore', 'two-orbital-task']) {
