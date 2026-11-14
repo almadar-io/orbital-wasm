@@ -88,12 +88,39 @@ fn run_script(script: &Value) -> Vec<Value> {
     )
     .unwrap();
     let kernel = KernelApi::new(&schema, script["clientId"].as_str().unwrap()).unwrap();
+    let mut held = std::collections::BTreeMap::new();
     script["steps"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|s| step(&kernel, s))
+        .map(|s| {
+            let answer = resolve_held(step(&kernel, s), &mut held);
+            for id in parsed(&kernel.held_released()).as_array().unwrap() {
+                held.remove(&id.as_u64().unwrap());
+            }
+            answer
+        })
         .collect()
+}
+
+/// The answer as the host reads it: each held leaf replaced by the value it names (EXEC-DIST-16).
+fn resolve_held(v: Value, held: &mut std::collections::BTreeMap<u64, Value>) -> Value {
+    match v {
+        Value::Object(m) if m.contains_key("$held") => {
+            let id = m["$held"].as_u64().expect("held id");
+            match m.get("value") {
+                Some(inner) => {
+                    let full = resolve_held(inner.clone(), held);
+                    held.insert(id, full.clone());
+                    full
+                }
+                None => held.get(&id).cloned().expect("a held id the host was handed and not released"),
+            }
+        }
+        Value::Object(m) => Value::Object(m.into_iter().map(|(k, v)| (k, resolve_held(v, held))).collect()),
+        Value::Array(a) => Value::Array(a.into_iter().map(|v| resolve_held(v, held)).collect()),
+        other => other,
+    }
 }
 
 #[test]
@@ -971,8 +998,10 @@ fn enter_and_leave_answer_the_seeds_and_the_unmount_legs_as_json() {
     assert_eq!(entered["seeds"], json!([{ "trait": "A", "event": "INIT" }]));
     assert_eq!(entered["left"], json!([]));
     let left = parsed(&kernel.leave().unwrap());
-    assert_eq!(left.as_array().unwrap().len(), 2);
+    assert_eq!(left.as_array().unwrap().len(), 1, "one orbital's traits leave in one leg");
+    assert_eq!(left[0]["traits"], json!(["A", "B"]));
     assert_eq!(left[0]["leg"]["event"], json!("$UNMOUNT"));
+    assert_eq!(left[0]["leg"]["unmount"], json!(["A", "B"]));
     assert_eq!(left[0]["leg"]["clientId"], json!("tab"));
     assert!(kernel.enter(Some("/"), "page", r#"["Nope"]"#).is_err());
 }
@@ -1131,4 +1160,75 @@ fn fx_projector_api_matches_canvas() {
         orbital_wasm::api::fx_hash01("fx-😀", 7),
         orbital_canvas::fx_projection::fx_hash01("fx-😀", 7)
     );
+}
+
+fn viewer_program() -> String {
+    let mut schema = read_json(&embed_dir().join("resolved/entity-rerender.json"));
+    let orbital = &mut schema["orbitals"][0];
+    orbital["entity"]["fields"].as_array_mut().unwrap().push(json!({ "name": "program", "type": "object", "nullable": true }));
+    orbital["traits"].as_array_mut().unwrap().push(json!({
+        "dispatch": "client",
+        "effectRow": [{ "kind": "render-ui", "resource": "main" }, { "kind": "set", "resource": "@entity.program" }],
+        "linkedEntity": "Arena",
+        "name": "Viewer",
+        "stateMachine": {
+            "events": [{ "key": "LOAD", "name": "Load" }, { "key": "SHOW", "name": "Show" }],
+            "states": [{ "isInitial": true, "name": "showing" }],
+            "transitions": [
+                { "event": "LOAD", "from": "showing", "to": "showing", "effects": [
+                    ["set", "@entity.program", "@payload.program"],
+                    ["render-ui", "main", { "type": "guest-view", "program": "@entity.program" }]
+                ] },
+                { "event": "SHOW", "from": "showing", "to": "showing", "effects": [
+                    ["render-ui", "main", { "type": "guest-view", "program": "@entity.program" }]
+                ] }
+            ]
+        }
+    }));
+    orbital["pages"][0]["traits"].as_array_mut().unwrap().push(json!({ "ref": "Viewer" }));
+    schema.to_string()
+}
+
+fn rendered_program(answer: &Value) -> Value {
+    let effects = answer["response"]["clientEffectsByTrait"].as_array().expect("client effects");
+    let render = effects.iter().find(|e| e["traitName"] == "Viewer" && e["effect"][0] == "render-ui").expect("Viewer render");
+    let root = &render["effect"][2];
+    let root = if root.get("$held").is_some() { &root["value"] } else { root };
+    root["program"].clone()
+}
+
+fn held_id(leaf: &Value) -> u64 {
+    leaf["$held"].as_u64().expect("a held leaf")
+}
+
+#[test]
+fn a_render_repeats_a_held_program_by_reference_and_releases_it_when_the_row_lets_go() {
+    let kernel = KernelApi::new(&viewer_program(), "c").unwrap();
+    let program = json!({ "name": "crm", "traits": [{ "name": "Deals" }, { "name": "Contacts" }] });
+    let loaded = rendered_program(&parsed(&kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": program }).to_string())).unwrap()));
+    assert_eq!(loaded["value"], program);
+    let crm = held_id(&loaded);
+    for _ in 0..2 {
+        let shown = rendered_program(&parsed(&kernel.dispatch("Viewer", None, "SHOW", None).unwrap()));
+        assert_eq!(shown, json!({ "$held": crm }));
+    }
+    assert!(!parsed(&kernel.held_released()).as_array().unwrap().contains(&json!(crm)));
+    let other = json!({ "name": "hr", "traits": [] });
+    let replaced = rendered_program(&parsed(&kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": other }).to_string())).unwrap()));
+    assert_eq!(replaced["value"], other);
+    assert_ne!(held_id(&replaced), crm);
+    let _ = kernel.dispatch("Viewer", None, "SHOW", None).unwrap();
+    assert!(parsed(&kernel.held_released()).as_array().unwrap().contains(&json!(crm)));
+}
+
+#[test]
+fn control_an_answer_that_is_not_a_render_writes_the_held_row_inline() {
+    let kernel = KernelApi::new(&viewer_program(), "c").unwrap();
+    let empty = parsed(&kernel.dispatch("Viewer", None, "SHOW", None).unwrap());
+    assert_eq!(rendered_program(&empty), Value::Null);
+    let program = json!({ "name": "crm", "traits": [] });
+    let _ = kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": program }).to_string())).unwrap();
+    let frames = kernel.frames_since(0).unwrap();
+    assert!(!frames.contains("$held"));
+    assert!(frames.contains(r#""program":{"name":"crm","traits":[]}"#));
 }

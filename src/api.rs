@@ -40,6 +40,7 @@ pub struct KernelApi {
     embedded: EmbeddedKernel,
     last_error: Mutex<String>,
     trace: std::sync::Arc<orbital_core::runtime::dispatch_trace::TraceFeed>,
+    held: Mutex<orbital_core::held_values::HeldValues>,
 }
 
 fn to_json<T: Serialize>(value: &T) -> Result<String, String> {
@@ -56,6 +57,18 @@ fn side_of(side: &str) -> Result<orbital_core::protocols::ProtocolSide, String> 
 }
 
 impl KernelApi {
+    /// An answer as text, each held render value this host was already handed written by reference (EXEC-DIST-16).
+    fn json<T: Serialize>(&self, value: &T) -> Result<String, String> {
+        let mut held = self.held.lock().map_err(|_| "held values poisoned".to_string())?;
+        orbital_core::held_values::to_js_readable_json_held(value, &mut held)
+    }
+
+    /// The held-value ids the kernel has let go of since the last call, as a JSON array; the host drops them.
+    pub fn held_released(&self) -> String {
+        let released = self.held.lock().map(|mut held| held.take_released()).unwrap_or_default();
+        serde_json::Value::from(released).to_string()
+    }
+
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, ApiError> {
         let schema: OrbitalSchema =
             parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
@@ -66,6 +79,7 @@ impl KernelApi {
             embedded,
             last_error: Mutex::new(String::new()),
             trace,
+            held: Mutex::new(orbital_core::held_values::HeldValues::new()),
         })
     }
 
@@ -90,7 +104,7 @@ impl KernelApi {
     ) -> Result<String, String> {
         self.record((|| {
             self.embedded.owning_orbital(trait_name)?;
-            to_json(&self.embedded.dispatch_held(trait_name, entity_id, event, ticket)?)
+            self.json(&self.embedded.dispatch_held(trait_name, entity_id, event, ticket)?)
         })())
     }
 
@@ -113,7 +127,7 @@ impl KernelApi {
                 Some(s) if !s.is_empty() => parse(s, "payload_json")?,
                 _ => Value::Null,
             };
-            to_json(
+            self.json(
                 &self
                     .embedded
                     .dispatch(trait_name, entity_id, event, payload)?,
@@ -140,7 +154,7 @@ impl KernelApi {
                 Some(s) if !s.is_empty() => Some(parse(s, "base_json")?),
                 _ => None,
             };
-            to_json(&self.embedded.apply_server_response_since(
+            self.json(&self.embedded.apply_server_response_since(
                 &response,
                 &already,
                 base.as_ref(),
@@ -183,7 +197,7 @@ impl KernelApi {
                 FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
                 FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
             };
-            to_json(&progress)
+            self.json(&progress)
         })())
     }
 
@@ -200,7 +214,7 @@ impl KernelApi {
                 FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
                 FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
             };
-            to_json(&progress)
+            self.json(&progress)
         })())
     }
 
@@ -213,7 +227,7 @@ impl KernelApi {
                 FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
                 FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
             };
-            to_json(&progress)
+            self.json(&progress)
         })())
     }
 
@@ -223,7 +237,7 @@ impl KernelApi {
             self.embedded
                 .next_fold()
                 .map(|next| {
-                    to_json(&match next.outcome {
+                    self.json(&match next.outcome {
                         Ok(fold) => FoldedNextWire::Applied {
                             ticket: next.ticket,
                             fold,
@@ -247,7 +261,7 @@ impl KernelApi {
     pub fn stateful_leg(&self, leg_json: &str) -> Result<String, String> {
         self.record((|| {
             let leg: orbital_core::EventRequest = parse(leg_json, "leg_json")?;
-            to_json(&self.embedded.stateful_leg(leg))
+            self.json(&self.embedded.stateful_leg(leg))
         })())
     }
 
@@ -255,7 +269,7 @@ impl KernelApi {
     pub fn reseed_leg(&self, seeds_json: &str, entity_id: Option<&str>) -> Result<String, String> {
         self.record((|| {
             let seeds: Vec<MountSeed> = parse(seeds_json, "seeds_json")?;
-            to_json(&self.embedded.reseed_leg(&seeds, entity_id))
+            self.json(&self.embedded.reseed_leg(&seeds, entity_id))
         })())
     }
 
@@ -274,7 +288,7 @@ impl KernelApi {
             let seeded: Vec<String> = parse(seeded_json, "seeded_json")?;
             self.embedded
                 .fold_base(carried.as_ref(), &seeded, entity_id)
-                .map(|base| to_json(&base))
+                .map(|base| self.json(&base))
                 .transpose()
         })())
     }
@@ -294,13 +308,13 @@ impl KernelApi {
                 Some(s) if !s.is_empty() => parse(s, "payload_json")?,
                 _ => Value::Null,
             };
-            to_json(&self.embedded.dispatch_route_mount_crumbed(route, crumb, &seeds, entity_id, payload)?)
+            self.json(&self.embedded.dispatch_route_mount_crumbed(route, crumb, &seeds, entity_id, payload)?)
         })())
     }
 
     /// The delta a painter at version `since` of this kernel's frames needs: empty when current, else a snapshot.
     pub fn frames_since(&self, since: u64) -> Result<String, String> {
-        self.record(to_json(&self.embedded.frames_since(since)?))
+        self.record(self.json(&self.embedded.frames_since(since)?))
     }
 
     pub fn restore(
@@ -311,7 +325,7 @@ impl KernelApi {
     ) -> Result<String, String> {
         self.record((|| {
             let snapshot: TraitSnapshot = parse(snapshot_json, "snapshot_json")?;
-            to_json(&self.embedded.restore(trait_name, entity_id, snapshot))
+            self.json(&self.embedded.restore(trait_name, entity_id, snapshot))
         })())
     }
 
@@ -322,7 +336,7 @@ impl KernelApi {
         entity_id: Option<&str>,
     ) -> Result<String, String> {
         self.record((|| {
-            to_json(&self.embedded.tick(trait_name, tick_name, entity_id)?)
+            self.json(&self.embedded.tick(trait_name, tick_name, entity_id)?)
         })())
     }
 
@@ -334,7 +348,7 @@ impl KernelApi {
                 if let Some(first) = wire.errors.first() {
                     self.set_last_error(first.clone());
                 }
-                to_json(&wire).map(Some)
+                self.json(&wire).map(Some)
             }
         })())
     }
@@ -361,11 +375,11 @@ impl KernelApi {
     }
 
     pub fn trait_config(&self, trait_name: &str) -> Result<String, String> {
-        self.record((|| to_json(&self.embedded.trait_config(trait_name)?))())
+        self.record((|| self.json(&self.embedded.trait_config(trait_name)?))())
     }
 
     pub fn dispatch_mode(&self, trait_name: &str) -> Result<String, String> {
-        self.record((|| to_json(&self.embedded.dispatch_mode(trait_name)?))())
+        self.record((|| self.json(&self.embedded.dispatch_mode(trait_name)?))())
     }
 
     pub fn get_state(&self, trait_name: &str, entity_id: Option<&str>) -> String {
@@ -373,7 +387,7 @@ impl KernelApi {
     }
 
     pub fn snapshot(&self) -> Result<String, String> {
-        self.record(to_json(&self.embedded.snapshot()))
+        self.record(self.json(&self.embedded.snapshot()))
     }
 
     pub fn set_theme_mode(&self, mode: &str) -> Result<(), String> {
@@ -434,7 +448,7 @@ impl KernelApi {
         self.record(
             parse::<orbital_core::runtime::row_query::RowSetRef>(ref_json, "ref_json")
                 .and_then(|reference| self.embedded.resolve_rows(&reference))
-                .and_then(|page| to_json(&page)),
+                .and_then(|page| self.json(&page)),
         )
     }
 
@@ -451,7 +465,7 @@ impl KernelApi {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json")
                 .map(|t| self.embedded.remount(t))
-                .and_then(|left| to_json(&left)),
+                .and_then(|left| self.json(&left)),
         )
     }
 
@@ -466,13 +480,13 @@ impl KernelApi {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json")
                 .and_then(|t| self.embedded.enter(route_path, mount_key, t))
-                .and_then(|entered| to_json(&entered)),
+                .and_then(|entered| self.json(&entered)),
         )
     }
 
     /// Every trait the page entered leaves: the legs that release them (`Left[]` as JSON).
     pub fn leave(&self) -> Result<String, String> {
-        self.record(to_json(&self.embedded.leave()))
+        self.record(self.json(&self.embedded.leave()))
     }
 
     /// The page's locale `i18n/t` paints in when a dispatch names none (`None`: the program's first declared).
@@ -488,12 +502,12 @@ impl KernelApi {
 
     /// The kernel's mounts for a host start on `side` (`client|server|process|start`), `MountSeed[]` as JSON.
     pub fn boot_mounts(&self, side: &str) -> Result<String, String> {
-        self.record(side_of(side).and_then(|side| to_json(&self.embedded.boot_mounts(side))))
+        self.record(side_of(side).and_then(|side| self.json(&self.embedded.boot_mounts(side))))
     }
 
     /// The kernel's mounts for a client opening `route_path`, `MountSeed[]` as JSON.
     pub fn route_mounts(&self, route_path: &str) -> Result<String, String> {
-        self.record(to_json(&self.embedded.route_mounts(route_path)))
+        self.record(self.json(&self.embedded.route_mounts(route_path)))
     }
 
     /// The circuit a client mounts for `page` or `route` (neither: the initial page), a `PageCircuit` as JSON.
@@ -501,7 +515,7 @@ impl KernelApi {
         self.record(
             self.embedded
                 .page_circuit(page, route)
-                .and_then(|c| to_json(&c)),
+                .and_then(|c| self.json(&c)),
         )
     }
 
@@ -513,7 +527,7 @@ impl KernelApi {
                 "query_json",
             )
             .and_then(|query| self.embedded.contract_query(query))
-            .and_then(|answer| to_json(&answer)),
+            .and_then(|answer| self.json(&answer)),
         )
     }
 
@@ -522,7 +536,7 @@ impl KernelApi {
         self.record(
             parse::<Vec<String>>(traits_json, "traits_json")
                 .map(|t| self.embedded.unmount(t))
-                .and_then(|left| to_json(&left)),
+                .and_then(|left| self.json(&left)),
         )
     }
 

@@ -251,6 +251,12 @@ impl Kernel {
         self.pumped(self.api.next_fold().map_err(js))
     }
 
+    /// The held render values (EXEC-DIST-16) the kernel has let go of since the last call: a JSON array of ids.
+    #[wasm_bindgen(js_name = heldReleased)]
+    pub fn held_released(&self) -> String {
+        self.api.held_released()
+    }
+
     #[wasm_bindgen(js_name = endFlight)]
     pub fn end_flight(&self, flight: f64) -> bool {
         self.api.end_flight(flight as u64)
