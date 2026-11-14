@@ -23,9 +23,48 @@ extern "C" {
     fn console_error(message: &str);
 }
 
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOC: orbital_core::alloc_meter::CountingAlloc<std::alloc::System> =
+    orbital_core::alloc_meter::CountingAlloc::thread_only(std::alloc::System);
+
 #[wasm_bindgen(start)]
 fn report_panics() {
     std::panic::set_hook(Box::new(|info| console_error(&info.to_string())));
+    #[cfg(target_arch = "wasm32")]
+    orbital_core::alloc_meter::declare_installed();
+}
+
+/// The browser kernel's cost meter (EXEC-COST-1): `performance.now()`, the clock a Chrome trace aligns to, and this
+/// thread's counting-allocator reading.
+#[cfg(target_arch = "wasm32")]
+struct BrowserMeter(js_sys::Function, wasm_bindgen::JsValue);
+
+#[cfg(target_arch = "wasm32")]
+// SAFETY: a wasm kernel runs on one thread; the meter never leaves it.
+unsafe impl Send for BrowserMeter {}
+#[cfg(target_arch = "wasm32")]
+// SAFETY: as above.
+unsafe impl Sync for BrowserMeter {}
+
+#[cfg(target_arch = "wasm32")]
+impl orbital_core::cost::CostMeter for BrowserMeter {
+    fn now_ns(&self) -> u64 {
+        let ms = self.0.call0(&self.1).ok().and_then(|v| v.as_f64()).expect("performance.now answers a number");
+        (ms * 1_000_000.0) as u64
+    }
+    fn allocations(&self) -> (u64, u64) {
+        let counts = orbital_core::alloc_meter::thread_counts();
+        (counts.allocs as u64, counts.bytes as u64)
+    }
+}
+
+/// The meter, when the page has `performance.now`; without it the kernel reports no cost.
+#[cfg(target_arch = "wasm32")]
+fn browser_meter() -> Option<std::sync::Arc<dyn orbital_core::cost::CostMeter>> {
+    let performance = js_sys::Reflect::get(&js_sys::global(), &"performance".into()).ok()?;
+    let now: js_sys::Function = js_sys::Reflect::get(&performance, &"now".into()).ok()?.dyn_into().ok()?;
+    Some(std::sync::Arc::new(BrowserMeter(now, performance)))
 }
 
 fn js(error: impl std::fmt::Display) -> JsError {
@@ -90,6 +129,12 @@ impl Kernel {
     #[wasm_bindgen(constructor)]
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Kernel, JsError> {
         KernelApi::new(resolved_schema_json, client_id)
+            .inspect(|api| {
+                #[cfg(target_arch = "wasm32")]
+                api.set_cost_meter(browser_meter());
+                #[cfg(not(target_arch = "wasm32"))]
+                let _ = api;
+            })
             .map(|api| Kernel {
                 api: std::rc::Rc::new(api),
                 gpu: std::cell::RefCell::new(None),
@@ -343,6 +388,18 @@ impl Kernel {
     #[wasm_bindgen(js_name = setTraceOn)]
     pub fn set_trace_on(&self, on: bool) {
         self.api.set_trace_on(on);
+    }
+
+    /// Measure each recorded dispatch while on (EXEC-COST-1).
+    #[wasm_bindgen(js_name = setTraceCost)]
+    pub fn set_trace_cost(&self, on: bool) {
+        self.api.set_trace_cost(on);
+    }
+
+    /// The items recorded since the last take, each `{ plain, costed? }` (EXEC-COST-1): a JSON array.
+    #[wasm_bindgen(js_name = takeTraceViews)]
+    pub fn take_trace_views(&self) -> Result<String, JsError> {
+        self.api.take_trace_views().map_err(js)
     }
 
     /// The trace items recorded since the last take, in dispatch order: a JSON array.

@@ -1,3 +1,5 @@
 pkg/
 pkg-client/
 node_modules/
+pkg-profiling/
+pkg-client-profiling/

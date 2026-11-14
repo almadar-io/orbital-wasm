@@ -395,6 +395,31 @@ impl KernelApi {
         serde_json::to_string(&self.trace.take()).map_err(|e| format!("trace items: {e}"))
     }
 
+    /// Measure each recorded dispatch while on (EXEC-COST-1).
+    pub fn set_trace_cost(&self, on: bool) {
+        self.trace.set_cost(on);
+    }
+
+    /// The items recorded since the last take, each as `{ plain, costed? }`: the view a stream without cost reads and,
+    /// for a measured dispatch, the view a cost stream reads.
+    pub fn take_trace_views(&self) -> Result<String, String> {
+        let views: Vec<serde_json::Value> = self
+            .trace
+            .take_views()
+            .into_iter()
+            .map(|v| match v.costed {
+                Some(costed) => serde_json::json!({ "plain": v.plain, "costed": costed }),
+                None => serde_json::json!({ "plain": v.plain }),
+            })
+            .collect();
+        serde_json::to_string(&views).map_err(|e| format!("trace items: {e}"))
+    }
+
+    /// The host's cost meter for this kernel (EXEC-COST-1).
+    pub fn set_cost_meter(&self, meter: Option<std::sync::Arc<dyn orbital_core::cost::CostMeter>>) {
+        self.embedded.kernel().set_cost_meter(meter);
+    }
+
     /// Carry each hop's `@entity` before and after it on the dispatch's transitions, for a verifier (EXEC-STEP-10).
     pub fn set_record_entity_after(&self, record: bool) {
         self.embedded.set_record_entity_after(record);
