@@ -7,5 +7,6 @@ Every open gap this repo owns lives here. This file is the source of truth; the 
 - **Codes:** new gaps use this repo's prefix `G-ORBITAL-WASM-`. Take the "Next code" below, then bump it in the same edit. Codes are never reused or renamed.
 - **Close by deleting.** Remove the entry in the same commit as the fix.
 
-Next code: `G-ORBITAL-WASM-009`
+Next code: `G-ORBITAL-WASM-010`
 
+- **G-ORBITAL-WASM-009** [architectural] — The browser kernel's wasm linear memory only grows: one tab reaches about 540 MB after std-kflow and osama-site are opened once (114 MB on std-accounting alone) and keeps it after both close, though the guest kernels are freed (live kernels stay at 2 after the 2026-11-14 night fix). WebAssembly memory cannot shrink, so every large guest raises the tab's floor for its life. Fix direction (needs a design): run guest kernels in their own instance (a worker or a separate wasm instance per guest) so closing a guest returns its memory. Reproduce: the catalog sequence in scratchpad `mem-seq.mjs` (wasm buffer byteLength per step). Prevention rung: (3) the verifiers (the per-open memory budget). Severity: low. Root cause: one-off.
