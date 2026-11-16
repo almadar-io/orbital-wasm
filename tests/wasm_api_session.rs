@@ -1370,3 +1370,32 @@ fn control_a_fold_with_no_blobs_handed_reads_the_program_inline() {
     let folded = HeldHost::default().read(&kernel.fold_in_order(flight, &guest_client_answer(program.clone()), None, None, None).unwrap());
     assert_eq!(guest_view_program(&folded), program);
 }
+
+// The owner's idle error: a session that ended mounts again with the frames it holds, and the host echoes a blob marker
+// the kernel still holds. It reads as that same handle; it was read as a plain record, and the blob was released.
+#[test]
+fn an_answer_echoing_a_blob_the_kernel_holds_keeps_it() {
+    let kernel = KernelApi::new(&blob_viewer(), "c").unwrap();
+    let flight = kernel.open_flight();
+    kernel.fold_in_order(flight, &guest_client_answer(json!({ "$blob": 5 })), None, None, Some("[5]")).unwrap();
+    kernel.end_flight(flight);
+    let flight = kernel.open_flight();
+    let folded = parsed(&kernel.fold_in_order(flight, &guest_client_answer(json!({ "$blob": 5 })), None, None, None).unwrap());
+    kernel.end_flight(flight);
+    assert_eq!(guest_view_program(&folded), json!({ "$blob": 5 }));
+    assert_eq!(parsed(&kernel.blobs_released()), json!([]), "the echoed blob is the one the kernel holds");
+}
+
+#[test]
+fn control_an_echo_of_a_blob_the_kernel_let_go_is_refused() {
+    let kernel = KernelApi::new(&blob_viewer(), "c").unwrap();
+    let flight = kernel.open_flight();
+    kernel.fold_in_order(flight, &guest_client_answer(json!({ "$blob": 5 })), None, None, Some("[5]")).unwrap();
+    kernel.end_flight(flight);
+    let flight = kernel.open_flight();
+    kernel.fold_in_order(flight, &guest_client_answer(json!({ "$blob": 6 })), None, None, Some("[6]")).unwrap();
+    kernel.end_flight(flight);
+    assert!(parsed(&kernel.blobs_released()).as_array().unwrap().contains(&json!(5)));
+    let refused = kernel.fold_in_order(kernel.open_flight(), &guest_client_answer(json!({ "$blob": 5 })), None, None, None).unwrap_err();
+    assert!(refused.contains("never handed"), "{refused}");
+}

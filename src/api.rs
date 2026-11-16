@@ -70,6 +70,13 @@ impl KernelApi {
         serde_json::Value::from(released).to_string()
     }
 
+    /// A host's text read with every blob this kernel holds readable by its marker (EXEC-DIST-16b), so a host that echoes
+    /// state it was handed (a remount with the frames it holds) keeps the kernel's handle.
+    fn read_held<T: serde::de::DeserializeOwned>(&self, json: &str, what: &str) -> Result<T, String> {
+        let mut blobs = self.blobs.lock().map_err(|_| "blobs poisoned".to_string())?;
+        orbital_core::blobs::read_with(&mut blobs, &[], || parse(json, what))
+    }
+
     /// The blob ids (EXEC-DIST-16b) the kernel has let go of since the last call, as a JSON array; the host drops their bytes.
     pub fn blobs_released(&self) -> String {
         let released = self.blobs.lock().map(|mut blobs| blobs.take_released()).unwrap_or_default();
@@ -150,7 +157,7 @@ impl KernelApi {
         base_json: Option<&str>,
     ) -> Result<String, String> {
         self.record((|| {
-            let response: EventResponse = parse(response_json, "response_json")?;
+            let response: EventResponse = self.read_held(response_json, "response_json")?;
             let already: HashSet<(String, String)> = match already_delivered_json {
                 Some(s) if !s.is_empty() => {
                     let pairs: Vec<(String, String)> = parse(s, "already_delivered_json")?;
@@ -186,13 +193,13 @@ impl KernelApi {
         blobs_json: Option<&str>,
     ) -> Result<String, String> {
         self.record((|| {
-            let response: EventResponse = match blobs_json {
-                Some(ids) if !ids.is_empty() => {
-                    let handed: Vec<u64> = parse(ids, "blobs_json")?;
-                    let mut blobs = self.blobs.lock().map_err(|_| "blobs poisoned".to_string())?;
-                    orbital_core::blobs::read_with(&mut blobs, &handed, || parse(response_json, "response_json"))?
-                }
-                _ => parse(response_json, "response_json")?,
+            let handed: Vec<u64> = match blobs_json {
+                Some(ids) if !ids.is_empty() => parse(ids, "blobs_json")?,
+                _ => Vec::new(),
+            };
+            let response: EventResponse = {
+                let mut blobs = self.blobs.lock().map_err(|_| "blobs poisoned".to_string())?;
+                orbital_core::blobs::read_with(&mut blobs, &handed, || parse(response_json, "response_json"))?
             };
             let already: HashSet<(String, String)> = match already_delivered_json {
                 Some(s) if !s.is_empty() => {
@@ -225,7 +232,7 @@ impl KernelApi {
         emitted_json: &str,
     ) -> Result<String, String> {
         self.record((|| {
-            let emitted: orbital_core::EmittedEvent = parse(emitted_json, "emitted_json")?;
+            let emitted: orbital_core::EmittedEvent = self.read_held(emitted_json, "emitted_json")?;
             let progress = match self.embedded.deliver_emit_to_listeners(flight, emitted)? {
                 FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
                 FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
@@ -238,7 +245,7 @@ impl KernelApi {
     /// arm as that call's progress dispatch: the emitter is not delivered its own emit a second time.
     pub fn deliver_origin_emit(&self, flight: u64, emitted_json: &str) -> Result<String, String> {
         self.record((|| {
-            let emitted: orbital_core::EmittedEvent = parse(emitted_json, "emitted_json")?;
+            let emitted: orbital_core::EmittedEvent = self.read_held(emitted_json, "emitted_json")?;
             let progress = match self.embedded.deliver_origin_emit(flight, emitted)? {
                 FoldProgress::Applied(fold) => FoldProgressWire::Applied { fold: *fold },
                 FoldProgress::Queued { ticket } => FoldProgressWire::Queued { ticket },
