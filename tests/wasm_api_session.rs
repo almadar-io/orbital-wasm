@@ -937,11 +937,11 @@ fn an_answer_ahead_of_an_older_flight_is_queued_and_folded_by_next_fold_once_tha
     let first = flight_of(&kernel, "INIT");
     let second = flight_of(&kernel, "INIT");
     assert!(first < second);
-    let queued = parsed(&kernel.fold_in_order(second, ANSWER, None, None).unwrap());
+    let queued = parsed(&kernel.fold_in_order(second, ANSWER, None, None, None).unwrap());
     assert_eq!(queued["status"], "queued");
     assert!(kernel.next_fold().unwrap().is_none());
     assert_eq!(
-        parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"],
+        parsed(&kernel.fold_in_order(first, ANSWER, None, None, None).unwrap())["status"],
         "applied"
     );
     assert!(kernel.end_flight(first));
@@ -961,11 +961,11 @@ fn control_answers_in_dispatch_order_fold_at_once_and_an_unknown_flight_is_an_er
     let kernel = ordered_kernel();
     let first = flight_of(&kernel, "INIT");
     assert_eq!(
-        parsed(&kernel.fold_in_order(first, ANSWER, None, None).unwrap())["status"],
+        parsed(&kernel.fold_in_order(first, ANSWER, None, None, None).unwrap())["status"],
         "applied"
     );
     assert!(kernel
-        .fold_in_order(first + 100, ANSWER, None, None)
+        .fold_in_order(first + 100, ANSWER, None, None, None)
         .is_err());
     assert!(!kernel.end_flight(first + 100));
 }
@@ -1291,4 +1291,82 @@ fn control_a_state_snapshot_writes_a_scalar_field_inline() {
     let _ = kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": { "name": "crm", "traits": [] } }).to_string())).unwrap();
     let frames = kernel.frames_since(0).unwrap();
     assert_eq!(frames.matches("$held").count(), 1, "only the shared program is named by reference: {frames}");
+}
+
+// EXEC-DIST-16b: the viewer folds a server answer whose SExpr-typed program the host keeps as a blob.
+fn blob_viewer() -> String {
+    json!({
+        "name": "viewer", "typeContractVersion": 1, "orbitals": [{
+            "name": "Sessions",
+            "entity": { "name": "Session", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }] },
+            "traits": [{ "name": "GuestSession", "linkedEntity": "Session",
+                "emits": [{ "event": "GUEST_CLIENT", "scope": "external", "payloadSchema": [
+                    { "name": "guest", "type": "string", "required": true }, { "name": "program", "type": "SExpr", "required": true }] }],
+                "stateMachine": { "states": [{ "name": "idle", "isInitial": true }], "transitions": [
+                    { "from": "idle", "to": "idle", "event": "LOAD", "effects": [] }] } }]
+        }, {
+            "name": "Stages",
+            "entity": { "name": "Stage", "persistence": "runtime", "fields": [{ "name": "id", "type": "string" }, { "name": "client", "type": "SExpr" }] },
+            "traits": [{ "name": "GuestStage", "linkedEntity": "Stage", "dispatch": "client",
+                "listens": [{ "event": "GUEST_CLIENT", "triggers": "GUEST_CLIENT", "source": { "kind": "orbital", "orbital": "Sessions", "trait": "GuestSession" } }],
+                "stateMachine": {
+                    "events": [{ "key": "GUEST_CLIENT", "name": "Guest Client", "payloadSchema": [
+                        { "name": "guest", "type": "string", "required": true }, { "name": "program", "type": "SExpr", "required": true }] }],
+                    "states": [{ "name": "idle", "isInitial": true }], "transitions": [
+                    { "from": "idle", "to": "idle", "event": "GUEST_CLIENT", "effects": [
+                        ["set", "@entity.client", "@payload.program"],
+                        ["render-ui", "main", { "type": "guest-view", "guest": "@payload.guest", "program": "@entity.client" }]] }] } }]
+        }]
+    })
+    .to_string()
+}
+
+fn guest_client_answer(program: Value) -> String {
+    json!({ "success": true, "transitioned": true, "emittedEvents": [{ "event": "GUEST_CLIENT",
+        "payload": { "guest": "g", "program": program }, "source": { "orbital": "Sessions", "trait": "GuestSession" } }] })
+    .to_string()
+}
+
+fn guest_view_program(answer: &Value) -> Value {
+    let effects = answer["fold"]["response"]["clientEffectsByTrait"].as_array().expect("client effects");
+    let render = effects.iter().find(|e| e["traitName"] == "GuestStage" && e["effect"][0] == "render-ui").expect("GuestStage render");
+    let root = &render["effect"][2];
+    let root = if root.get("$held").is_some() { &root["value"] } else { root };
+    root["program"].clone()
+}
+
+#[test]
+fn a_folded_blob_is_stored_and_rendered_by_its_marker_and_released_when_replaced() {
+    let kernel = KernelApi::new(&blob_viewer(), "c").unwrap();
+    let flight = kernel.open_flight();
+    let folded = parsed(&kernel.fold_in_order(flight, &guest_client_answer(json!({ "$blob": 5 })), None, None, Some("[5]")).unwrap());
+    assert_eq!(folded["status"], "applied", "{folded}");
+    assert_eq!(guest_view_program(&folded), json!({ "$blob": 5 }));
+    kernel.end_flight(flight);
+    assert_eq!(parsed(&kernel.blobs_released()), json!([]), "the stage's entity holds blob 5");
+    let flight = kernel.open_flight();
+    let folded = parsed(&kernel.fold_in_order(flight, &guest_client_answer(json!({ "$blob": 6 })), None, None, Some("[6, 7]")).unwrap());
+    assert_eq!(guest_view_program(&folded), json!({ "$blob": 6 }));
+    kernel.end_flight(flight);
+    let released = parsed(&kernel.blobs_released());
+    assert!(released.as_array().unwrap().contains(&json!(5)), "the replaced blob is released: {released}");
+    assert!(released.as_array().unwrap().contains(&json!(7)), "a handed blob the answer never named is released: {released}");
+    assert!(!released.as_array().unwrap().contains(&json!(6)), "control: the held blob is not: {released}");
+}
+
+#[test]
+fn a_fold_naming_a_blob_never_handed_is_refused() {
+    let kernel = KernelApi::new(&blob_viewer(), "c").unwrap();
+    let flight = kernel.open_flight();
+    let refused = kernel.fold_in_order(flight, &guest_client_answer(json!({ "$blob": 9 })), None, None, Some("[5]")).unwrap_err();
+    assert!(refused.contains("never handed"), "{refused}");
+}
+
+#[test]
+fn control_a_fold_with_no_blobs_handed_reads_the_program_inline() {
+    let kernel = KernelApi::new(&blob_viewer(), "c").unwrap();
+    let program = json!({ "name": "crm", "orbitals": [] });
+    let flight = kernel.open_flight();
+    let folded = HeldHost::default().read(&kernel.fold_in_order(flight, &guest_client_answer(program.clone()), None, None, None).unwrap());
+    assert_eq!(guest_view_program(&folded), program);
 }

@@ -41,6 +41,7 @@ pub struct KernelApi {
     last_error: Mutex<String>,
     trace: std::sync::Arc<orbital_core::runtime::dispatch_trace::TraceFeed>,
     held: Mutex<orbital_core::held_values::HeldValues>,
+    blobs: Mutex<orbital_core::blobs::Blobs>,
 }
 
 fn to_json<T: Serialize>(value: &T) -> Result<String, String> {
@@ -69,6 +70,12 @@ impl KernelApi {
         serde_json::Value::from(released).to_string()
     }
 
+    /// The blob ids (EXEC-DIST-16b) the kernel has let go of since the last call, as a JSON array; the host drops their bytes.
+    pub fn blobs_released(&self) -> String {
+        let released = self.blobs.lock().map(|mut blobs| blobs.take_released()).unwrap_or_default();
+        serde_json::Value::from(released).to_string()
+    }
+
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, ApiError> {
         let schema: OrbitalSchema =
             parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
@@ -80,6 +87,7 @@ impl KernelApi {
             last_error: Mutex::new(String::new()),
             trace,
             held: Mutex::new(orbital_core::held_values::HeldValues::new()),
+            blobs: Mutex::new(orbital_core::blobs::Blobs::new()),
         })
     }
 
@@ -168,16 +176,24 @@ impl KernelApi {
     }
 
     /// [`Self::apply_server_response`] in flight order (EXEC-CONC-8): a `FoldProgressWire` as JSON, the answer folded
-    /// now or queued behind an older flight.
+    /// now or queued behind an older flight. `blobs_json` lists the blob ids (EXEC-DIST-16b) the host handed with it.
     pub fn fold_in_order(
         &self,
         flight: u64,
         response_json: &str,
         already_delivered_json: Option<&str>,
         base_json: Option<&str>,
+        blobs_json: Option<&str>,
     ) -> Result<String, String> {
         self.record((|| {
-            let response: EventResponse = parse(response_json, "response_json")?;
+            let response: EventResponse = match blobs_json {
+                Some(ids) if !ids.is_empty() => {
+                    let handed: Vec<u64> = parse(ids, "blobs_json")?;
+                    let mut blobs = self.blobs.lock().map_err(|_| "blobs poisoned".to_string())?;
+                    orbital_core::blobs::read_with(&mut blobs, &handed, || parse(response_json, "response_json"))?
+                }
+                _ => parse(response_json, "response_json")?,
+            };
             let already: HashSet<(String, String)> = match already_delivered_json {
                 Some(s) if !s.is_empty() => {
                     parse::<Vec<(String, String)>>(s, "already_delivered_json")?

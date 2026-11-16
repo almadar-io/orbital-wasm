@@ -231,6 +231,7 @@ impl Kernel {
         response_json: &[u8],
         already_delivered_json: Option<String>,
         base_json: Option<String>,
+        blobs_json: Option<String>,
     ) -> Result<String, JsError> {
         self.pumped(self.api
             .fold_in_order(
@@ -238,6 +239,7 @@ impl Kernel {
                 std::str::from_utf8(response_json).map_err(|e| format!("response_json: {e}")).map_err(js)?,
                 already_delivered_json.as_deref(),
                 base_json.as_deref(),
+                blobs_json.as_deref(),
             )
             .map_err(js))
     }
@@ -269,6 +271,12 @@ impl Kernel {
     #[wasm_bindgen(js_name = heldReleased)]
     pub fn held_released(&self) -> String {
         self.api.held_released()
+    }
+
+    /// The blobs (EXEC-DIST-16b) the kernel has let go of since the last call: a JSON array of ids.
+    #[wasm_bindgen(js_name = blobsReleased)]
+    pub fn blobs_released(&self) -> String {
+        self.api.blobs_released()
     }
 
     #[wasm_bindgen(js_name = endFlight)]

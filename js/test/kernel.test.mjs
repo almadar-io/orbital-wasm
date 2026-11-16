@@ -252,3 +252,50 @@ test('control: an instance still referenced keeps its memory through the same co
   }
   assert.equal(held.deref(), instance.memory);
 });
+
+// EXEC-DIST-16b: twin of `wasm_api_session` `a_folded_blob_is_stored_and_rendered_by_its_marker_and_released_when_replaced`.
+const blobViewer = JSON.stringify({
+  name: 'viewer', typeContractVersion: 1, orbitals: [{
+    name: 'Sessions',
+    entity: { name: 'Session', persistence: 'runtime', fields: [{ name: 'id', type: 'string' }] },
+    traits: [{ name: 'GuestSession', linkedEntity: 'Session',
+      emits: [{ event: 'GUEST_CLIENT', scope: 'external', payloadSchema: [{ name: 'guest', type: 'string', required: true }, { name: 'program', type: 'SExpr', required: true }] }],
+      stateMachine: { states: [{ name: 'idle', isInitial: true }], transitions: [{ from: 'idle', to: 'idle', event: 'LOAD', effects: [] }] } }],
+  }, {
+    name: 'Stages',
+    entity: { name: 'Stage', persistence: 'runtime', fields: [{ name: 'id', type: 'string' }, { name: 'client', type: 'SExpr' }] },
+    traits: [{ name: 'GuestStage', linkedEntity: 'Stage', dispatch: 'client',
+      listens: [{ event: 'GUEST_CLIENT', triggers: 'GUEST_CLIENT', source: { kind: 'orbital', orbital: 'Sessions', trait: 'GuestSession' } }],
+      stateMachine: {
+        events: [{ key: 'GUEST_CLIENT', name: 'Guest Client', payloadSchema: [{ name: 'guest', type: 'string', required: true }, { name: 'program', type: 'SExpr', required: true }] }],
+        states: [{ name: 'idle', isInitial: true }],
+        transitions: [{ from: 'idle', to: 'idle', event: 'GUEST_CLIENT', effects: [['set', '@entity.client', '@payload.program'], ['render-ui', 'main', { type: 'guest-view', guest: '@payload.guest', program: '@entity.client' }]] }],
+      } }],
+  }],
+});
+const guestClient = (program) => utf8.encode(JSON.stringify({ success: true, transitioned: true, emittedEvents: [{ event: 'GUEST_CLIENT', payload: { guest: 'g', program }, source: { orbital: 'Sessions', trait: 'GuestSession' } }] }));
+const renderedProgram = (text) => {
+  const held = new Map();
+  const answer = resolveHeld(JSON.parse(text), held);
+  const render = answer.fold.response.clientEffectsByTrait.find((e) => e.traitName === 'GuestStage' && e.effect[0] === 'render-ui');
+  return render.effect[2].program;
+};
+
+test('a folded blob is stored and rendered by its marker, and released once replaced (EXEC-DIST-16b)', () => {
+  const kernel = new Kernel(utf8.encode(blobViewer), 'c');
+  let flight = kernel.openFlight();
+  assert.deepEqual(renderedProgram(kernel.foldInOrder(flight, guestClient({ $blob: 5 }), undefined, undefined, '[5]')), { $blob: 5 });
+  kernel.endFlight(flight);
+  assert.deepEqual(JSON.parse(kernel.blobsReleased()), []);
+  flight = kernel.openFlight();
+  assert.deepEqual(renderedProgram(kernel.foldInOrder(flight, guestClient({ $blob: 6 }), undefined, undefined, '[6]')), { $blob: 6 });
+  kernel.endFlight(flight);
+  assert.deepEqual(JSON.parse(kernel.blobsReleased()), [5]);
+  assert.throws(() => kernel.foldInOrder(kernel.openFlight(), guestClient({ $blob: 9 }), undefined, undefined, '[7]'), /never handed/);
+});
+
+test('control: a fold with no blobs handed reads the program inline', () => {
+  const kernel = new Kernel(utf8.encode(blobViewer), 'c');
+  const program = { name: 'crm', orbitals: [] };
+  assert.deepEqual(renderedProgram(kernel.foldInOrder(kernel.openFlight(), guestClient(program))), program);
+});
