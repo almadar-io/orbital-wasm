@@ -181,8 +181,8 @@ const notesSchema = () => utf8.encode(readFileSync(join(here, 'fixtures/notes.re
 test('each kernel instance has its own memory, so one growing leaves the other as it was', async () => {
   const { createKernelInstance } = await loadInstanceFactory();
   const module = compiled();
-  const a = createKernelInstance(module, languageBundle());
-  const b = createKernelInstance(module, languageBundle());
+  const a = await createKernelInstance(module, languageBundle());
+  const b = await createKernelInstance(module, languageBundle());
   assert.notEqual(a.memory, b.memory, 'two instances, two memories');
   const before = a.memory.buffer.byteLength;
   const big = JSON.parse(readFileSync(join(here, 'fixtures/notes.resolved.json'), 'utf8'));
@@ -198,8 +198,8 @@ test('an instance nothing references any more has its memory collected', async (
   assert.equal(typeof globalThis.gc, 'function', 'the suite runs with --expose-gc');
   const { createKernelInstance } = await loadInstanceFactory();
   const module = compiled();
-  const held = (() => {
-    const instance = createKernelInstance(module, languageBundle());
+  const held = await (async () => {
+    const instance = await createKernelInstance(module, languageBundle());
     const kernel = new instance.Kernel(notesSchema(), 'client-c');
     kernel.free();
     return new WeakRef(instance.memory);
@@ -211,13 +211,40 @@ test('an instance nothing references any more has its memory collected', async (
   assert.equal(held.deref(), undefined, 'the dropped instance released its memory');
 });
 
+/** Runs `body` with `new WebAssembly.Instance` refused, as a browser's main thread refuses it for a module over 8 MB. */
+async function withoutSyncInstantiation(body) {
+  const Sync = WebAssembly.Instance;
+  WebAssembly.Instance = new Proxy(Sync, {
+    construct() {
+      throw new RangeError('WebAssembly.Instance is disallowed on the main thread, if the buffer size is larger than 8MB');
+    },
+  });
+  try {
+    return await body();
+  } finally {
+    WebAssembly.Instance = Sync;
+  }
+}
+
+test('an instance is made without synchronous instantiation, which a browser main thread refuses for the kernel', async () => {
+  const { createKernelInstance } = await loadInstanceFactory();
+  const module = compiled();
+  const instance = await withoutSyncInstantiation(() => createKernelInstance(module, languageBundle()));
+  assert.equal(typeof new instance.Kernel(notesSchema(), 'client-e').snapshot(), 'string');
+});
+
+test('control: the refusal stands in for the browser, so a synchronous instantiation fails under it', async () => {
+  const module = compiled();
+  await assert.rejects(withoutSyncInstantiation(() => new WebAssembly.Instance(module, {})), RangeError);
+});
+
 test('control: the module-level kernel keeps working beside the instances', () => {
   assert.equal(typeof new Kernel(notesSchema(), 'client-d').snapshot(), 'string');
 });
 
 test('control: an instance still referenced keeps its memory through the same collections', async () => {
   const { createKernelInstance } = await loadInstanceFactory();
-  const instance = createKernelInstance(compiled(), languageBundle());
+  const instance = await createKernelInstance(compiled(), languageBundle());
   const held = new WeakRef(instance.memory);
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 10));

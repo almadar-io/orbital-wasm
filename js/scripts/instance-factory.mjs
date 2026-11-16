@@ -23,17 +23,18 @@ const body = lines.map((line) => {
   if (/^(export|import)\b/.test(line)) throw new Error(`instance-factory: the glue has a module-level line this factory does not know: ${line}`);
   return line;
 });
-for (const needed of ['initSync', 'installLanguage', 'Kernel']) {
-  if (!body.some((line) => line.startsWith(`function ${needed}(`) || line.startsWith(`class ${needed} `))) {
+for (const needed of ['__wbg_init', 'installLanguage', 'Kernel']) {
+  if (!body.some((line) => line.startsWith(`function ${needed}(`) || line.startsWith(`async function ${needed}(`) || line.startsWith(`class ${needed} `))) {
     throw new Error(`instance-factory: the glue no longer defines ${needed}`);
   }
 }
 
+// Instantiated asynchronously: a browser refuses `new WebAssembly.Instance` on its main thread for a module over 8 MB.
 writeFileSync(join(dir, 'orbital_wasm_instance.js'), `// Generated from orbital_wasm.js by scripts/instance-factory.mjs; do not edit.
 /** A kernel instance with its own memory: \`module\` instantiated once more and \`languageBundle\` installed in it. */
-export function createKernelInstance(module, languageBundle) {
+export async function createKernelInstance(module, languageBundle) {
 ${body.join('\n')}
-initSync({ module });
+await __wbg_init({ module_or_path: module });
 installLanguage(languageBundle);
 return { memory: wasm.memory, ${names.join(', ')} };
 }
@@ -46,6 +47,6 @@ import type * as Glue from './orbital_wasm.js';
 export type KernelInstance = Omit<typeof Glue, 'default' | 'initSync'> & { readonly memory: WebAssembly.Memory };
 
 /** A kernel instance with its own memory: \`module\` instantiated once more and \`languageBundle\` installed in it. */
-export declare function createKernelInstance(module: WebAssembly.Module, languageBundle: string): KernelInstance;
+export declare function createKernelInstance(module: WebAssembly.Module, languageBundle: string): Promise<KernelInstance>;
 `);
 console.log(`instance-factory: ${join(dir, 'orbital_wasm_instance.js')} (${names.length} exports)`);
