@@ -42,6 +42,7 @@ build() {
   fi
   wasm-bindgen "$TARGET/wasm32-unknown-unknown/$PROFILE/orbital_wasm.wasm" \
     --target web --out-dir "$OUT" --out-name orbital_wasm $NAMES --remove-producers-section
+  node scripts/instance-factory.mjs "$OUT"
   if command -v wasm-opt >/dev/null 2>&1; then
     wasm-opt -O3 $OPT_NAMES --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals --enable-multivalue --enable-reference-types "$OUT/orbital_wasm_bg.wasm" -o "$OUT/orbital_wasm_bg.wasm"
   else

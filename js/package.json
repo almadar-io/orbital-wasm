@@ -13,10 +13,18 @@
       "types": "./pkg/orbital_wasm.d.ts",
       "default": "./pkg/orbital_wasm.js"
     },
+    "./instance": {
+      "types": "./pkg/orbital_wasm_instance.d.ts",
+      "default": "./pkg/orbital_wasm_instance.js"
+    },
     "./kernel.wasm": "./pkg/orbital_wasm_bg.wasm",
     "./client": {
       "types": "./pkg-client/orbital_wasm.d.ts",
       "default": "./pkg-client/orbital_wasm.js"
+    },
+    "./client/instance": {
+      "types": "./pkg-client/orbital_wasm_instance.d.ts",
+      "default": "./pkg-client/orbital_wasm_instance.js"
     },
     "./client.wasm": "./pkg-client/orbital_wasm_bg.wasm"
   },
@@ -28,7 +36,11 @@
     "pkg-client/orbital_wasm.js",
     "pkg-client/orbital_wasm.d.ts",
     "pkg-client/orbital_wasm_bg.wasm",
-    "pkg-client/orbital_wasm_bg.wasm.d.ts"
+    "pkg-client/orbital_wasm_bg.wasm.d.ts",
+    "pkg/orbital_wasm_instance.js",
+    "pkg/orbital_wasm_instance.d.ts",
+    "pkg-client/orbital_wasm_instance.js",
+    "pkg-client/orbital_wasm_instance.d.ts"
   ],
   "sideEffects": false,
   "engines": {
@@ -39,7 +51,7 @@
   },
   "scripts": {
     "build": "sh scripts/build.sh",
-    "test": "node --test test/*.test.mjs",
-    "test:client": "KERNEL_PKG=pkg-client node --test test/kernel.test.mjs test/server.test.mjs test/client.test.mjs"
+    "test": "node --expose-gc --test test/*.test.mjs",
+    "test:client": "KERNEL_PKG=pkg-client node --expose-gc --test test/kernel.test.mjs test/server.test.mjs test/client.test.mjs"
   }
 }

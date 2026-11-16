@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { pkgDir, loadPkg, languageBundle } from './pkg.mjs';
 
@@ -172,4 +172,56 @@ test('mapListenPayload, scopeRows, checkMutationAccess and resolveRowBinding are
   assert.deepEqual(kept.map((r) => r.id), ['a']);
   assert.equal(JSON.parse(checkMutationAccess('update', JSON.stringify({ user: { id: 'u2' } }), JSON.stringify(rows[0]), owner, 'Ticket')).allowed, false);
   assert.deepEqual(JSON.parse(resolveRowBinding('@user.id', JSON.stringify({ user: { id: 'u1' } }))), { kind: 'value', value: 'u1' });
+});
+
+const loadInstanceFactory = () => import(pathToFileURL(join(pkgDir, 'orbital_wasm_instance.js')).href);
+const compiled = () => new WebAssembly.Module(readFileSync(join(pkgDir, 'orbital_wasm_bg.wasm')));
+const notesSchema = () => utf8.encode(readFileSync(join(here, 'fixtures/notes.resolved.json'), 'utf8'));
+
+test('each kernel instance has its own memory, so one growing leaves the other as it was', async () => {
+  const { createKernelInstance } = await loadInstanceFactory();
+  const module = compiled();
+  const a = createKernelInstance(module, languageBundle());
+  const b = createKernelInstance(module, languageBundle());
+  assert.notEqual(a.memory, b.memory, 'two instances, two memories');
+  const before = a.memory.buffer.byteLength;
+  const big = JSON.parse(readFileSync(join(here, 'fixtures/notes.resolved.json'), 'utf8'));
+  big.description = 'x'.repeat(32 * 1024 * 1024);
+  const kernels = [new b.Kernel(utf8.encode(JSON.stringify(big)), 'client-b')];
+  assert.ok(b.memory.buffer.byteLength > before, 'the second instance grew');
+  assert.equal(a.memory.buffer.byteLength, before, 'the first did not');
+  assert.equal(typeof new a.Kernel(notesSchema(), 'client-a').snapshot(), 'string', 'each instance runs its own kernels');
+  kernels.forEach((k) => k.free());
+});
+
+test('an instance nothing references any more has its memory collected', async () => {
+  assert.equal(typeof globalThis.gc, 'function', 'the suite runs with --expose-gc');
+  const { createKernelInstance } = await loadInstanceFactory();
+  const module = compiled();
+  const held = (() => {
+    const instance = createKernelInstance(module, languageBundle());
+    const kernel = new instance.Kernel(notesSchema(), 'client-c');
+    kernel.free();
+    return new WeakRef(instance.memory);
+  })();
+  for (let i = 0; i < 20 && held.deref() !== undefined; i++) {
+    await new Promise((r) => setTimeout(r, 10));
+    globalThis.gc();
+  }
+  assert.equal(held.deref(), undefined, 'the dropped instance released its memory');
+});
+
+test('control: the module-level kernel keeps working beside the instances', () => {
+  assert.equal(typeof new Kernel(notesSchema(), 'client-d').snapshot(), 'string');
+});
+
+test('control: an instance still referenced keeps its memory through the same collections', async () => {
+  const { createKernelInstance } = await loadInstanceFactory();
+  const instance = createKernelInstance(compiled(), languageBundle());
+  const held = new WeakRef(instance.memory);
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 10));
+    globalThis.gc();
+  }
+  assert.equal(held.deref(), instance.memory);
 });

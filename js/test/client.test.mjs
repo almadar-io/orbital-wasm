@@ -20,9 +20,9 @@ test('a kernel refuses to start, with the typed error, until the language is ins
   const pkg = await loadPkg();
   pkg.initSync({ module: readFileSync(join(pkgDir, 'orbital_wasm_bg.wasm')) });
   const schema = readFileSync(join(here, 'fixtures/notes.resolved.json'), 'utf8');
-  assert.throws(() => new pkg.Kernel(schema, 'c1'), /ORB_LANGUAGE_DATA_NOT_INSTALLED/);
+  assert.throws(() => new pkg.Kernel(new TextEncoder().encode(schema), 'c1'), /ORB_LANGUAGE_DATA_NOT_INSTALLED/);
   assert.throws(() => new pkg.Server(schema), /ORB_LANGUAGE_DATA_NOT_INSTALLED/);
   pkg.installLanguage(languageBundle());
-  assert.doesNotThrow(() => new pkg.Kernel(schema, 'c1'));
+  assert.doesNotThrow(() => new pkg.Kernel(new TextEncoder().encode(schema), 'c1'));
   assert.doesNotThrow(() => new pkg.Server(schema));
 });
