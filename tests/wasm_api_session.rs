@@ -1201,34 +1201,94 @@ fn held_id(leaf: &Value) -> u64 {
     leaf["$held"].as_u64().expect("a held leaf")
 }
 
+/// What a host keeps of one kernel's held values (`HeldValues` in `@almadar/shell-runtime`): each answer read with every
+/// held leaf replaced by the value it names.
+#[derive(Default)]
+struct HeldHost(std::collections::HashMap<u64, Value>);
+
+impl HeldHost {
+    fn read(&mut self, text: &str) -> Value {
+        let mut answer = parsed(text);
+        self.resolve(&mut answer);
+        answer
+    }
+
+    fn resolve(&mut self, node: &mut Value) {
+        if let Some(id) = node.get("$held").and_then(Value::as_u64) {
+            *node = match node.get_mut("value").map(Value::take) {
+                Some(mut sent) => {
+                    self.resolve(&mut sent);
+                    self.0.insert(id, sent.clone());
+                    sent
+                }
+                None => self.0.get(&id).cloned().expect("a held value the host was handed"),
+            };
+            return;
+        }
+        match node {
+            Value::Array(items) => items.iter_mut().for_each(|item| self.resolve(item)),
+            Value::Object(fields) => fields.values_mut().for_each(|field| self.resolve(field)),
+            _ => {}
+        }
+    }
+}
+
+fn held_leaf(answer: &Value) -> Value {
+    let effects = answer["response"]["clientEffectsByTrait"].as_array().expect("client effects");
+    let render = effects.iter().find(|e| e["traitName"] == "Viewer" && e["effect"][0] == "render-ui").expect("Viewer render");
+    let root = &render["effect"][2];
+    let root = if root.get("$held").is_some() { &root["value"] } else { root };
+    root["program"].clone()
+}
+
 #[test]
 fn a_render_repeats_a_held_program_by_reference_and_releases_it_when_the_row_lets_go() {
     let kernel = KernelApi::new(&viewer_program(), "c").unwrap();
     let program = json!({ "name": "crm", "traits": [{ "name": "Deals" }, { "name": "Contacts" }] });
-    let loaded = rendered_program(&parsed(&kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": program }).to_string())).unwrap()));
-    assert_eq!(loaded["value"], program);
-    let crm = held_id(&loaded);
+    let mut host = HeldHost::default();
+    let text = kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": program }).to_string())).unwrap();
+    let crm = held_id(&held_leaf(&parsed(&text)));
+    assert_eq!(rendered_program(&host.read(&text)), program);
     for _ in 0..2 {
-        let shown = rendered_program(&parsed(&kernel.dispatch("Viewer", None, "SHOW", None).unwrap()));
-        assert_eq!(shown, json!({ "$held": crm }));
+        let text = kernel.dispatch("Viewer", None, "SHOW", None).unwrap();
+        assert_eq!(held_leaf(&parsed(&text)), json!({ "$held": crm }));
+        assert_eq!(rendered_program(&host.read(&text)), program);
     }
     assert!(!parsed(&kernel.held_released()).as_array().unwrap().contains(&json!(crm)));
     let other = json!({ "name": "hr", "traits": [] });
-    let replaced = rendered_program(&parsed(&kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": other }).to_string())).unwrap()));
-    assert_eq!(replaced["value"], other);
-    assert_ne!(held_id(&replaced), crm);
+    let text = kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": other }).to_string())).unwrap();
+    assert_eq!(rendered_program(&host.read(&text)), other);
+    assert_ne!(held_id(&held_leaf(&parsed(&text))), crm);
     let _ = kernel.dispatch("Viewer", None, "SHOW", None).unwrap();
     assert!(parsed(&kernel.held_released()).as_array().unwrap().contains(&json!(crm)));
 }
 
 #[test]
-fn control_an_answer_that_is_not_a_render_writes_the_held_row_inline() {
+fn a_dispatch_answer_writes_a_program_its_state_and_render_both_hold_once() {
     let kernel = KernelApi::new(&viewer_program(), "c").unwrap();
-    let empty = parsed(&kernel.dispatch("Viewer", None, "SHOW", None).unwrap());
-    assert_eq!(rendered_program(&empty), Value::Null);
+    let program = json!({ "name": "crm", "traits": [{ "name": "Deals" }] });
+    let answer = kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": program }).to_string())).unwrap();
+    assert_eq!(answer.matches(r#""name":"crm""#).count(), 1, "{answer}");
+    let read = HeldHost::default().read(&answer);
+    assert_eq!(rendered_program(&read), program, "the render still reads the whole program");
+    let frames = read["response"]["frames"]["ops"].to_string();
+    assert!(frames.contains(r#""program":{"name":"crm""#), "the state frame reads it too: {frames}");
+}
+
+#[test]
+fn a_state_snapshot_names_a_program_the_host_was_handed_by_reference() {
+    let kernel = KernelApi::new(&viewer_program(), "c").unwrap();
     let program = json!({ "name": "crm", "traits": [] });
-    let _ = kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": program }).to_string())).unwrap();
+    let crm = held_id(&held_leaf(&parsed(&kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": program }).to_string())).unwrap())));
     let frames = kernel.frames_since(0).unwrap();
-    assert!(!frames.contains("$held"));
-    assert!(frames.contains(r#""program":{"name":"crm","traits":[]}"#));
+    assert!(!frames.contains(r#""name":"crm""#), "{frames}");
+    assert!(frames.contains(&format!(r#""program":{{"$held":{crm}}}"#)), "{frames}");
+}
+
+#[test]
+fn control_a_state_snapshot_writes_a_scalar_field_inline() {
+    let kernel = KernelApi::new(&viewer_program(), "c").unwrap();
+    let _ = kernel.dispatch("Viewer", None, "LOAD", Some(&json!({ "program": { "name": "crm", "traits": [] } }).to_string())).unwrap();
+    let frames = kernel.frames_since(0).unwrap();
+    assert_eq!(frames.matches("$held").count(), 1, "only the shared program is named by reference: {frames}");
 }

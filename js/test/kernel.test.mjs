@@ -8,6 +8,7 @@ import { pkgDir, loadPkg, languageBundle } from './pkg.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const embed = join(here, '../../../orbital-core/tests/fixtures/embed');
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+const utf8 = new TextEncoder();
 
 const { Kernel, initSync, installLanguage, evaluateGuards, evaluateMany, evaluateTraced, mapListenPayload, scopeRows, checkMutationAccess, resolveRowBinding } = await loadPkg();
 initSync({ module: readFileSync(join(pkgDir, 'orbital_wasm_bg.wasm')) });
@@ -15,7 +16,7 @@ installLanguage(languageBundle());
 
 function run(script) {
   const schema = readFileSync(join(embed, 'resolved', `${script.schema}.json`), 'utf8');
-  const kernel = new Kernel(schema, script.clientId);
+  const kernel = new Kernel(utf8.encode(schema), script.clientId);
   let lastError = '';
   const attempt = (call) => {
     try {
@@ -127,7 +128,7 @@ test('control: a changed step breaks the golden', () => {
 
 test('a failed call throws an Error carrying the last_error message', () => {
   const schema = readFileSync(join(embed, 'resolved', 'basic-entity.json'), 'utf8');
-  const kernel = new Kernel(schema, 'c');
+  const kernel = new Kernel(utf8.encode(schema), 'c');
   assert.throws(() => kernel.dispatch('NoSuchTrait', undefined, 'INIT', undefined), (e) => {
     assert.ok(e instanceof Error);
     assert.equal(kernel.lastError(), e.message);
@@ -137,7 +138,7 @@ test('a failed call throws an Error carrying the last_error message', () => {
 });
 
 test('an empty schema is refused at construction', () => {
-  assert.throws(() => new Kernel('{"name":"Empty","orbitals":[]}', 'c'), /resolved schema declares no orbitals/);
+  assert.throws(() => new Kernel(utf8.encode('{"name":"Empty","orbitals":[]}'), 'c'), /resolved schema declares no orbitals/);
 });
 
 test('evaluateMany binds a render in one crossing; a failing expression is its own outcome (EXEC-EVAL-7)', () => {

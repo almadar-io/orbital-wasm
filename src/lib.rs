@@ -127,7 +127,8 @@ async fn drain_client_gpu(
 #[wasm_bindgen]
 impl Kernel {
     #[wasm_bindgen(constructor)]
-    pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Kernel, JsError> {
+    pub fn new(resolved_schema_json: &[u8], client_id: &str) -> Result<Kernel, JsError> {
+        let resolved_schema_json = std::str::from_utf8(resolved_schema_json).map_err(|e| js(format!("resolved_schema_json: {e}")))?;
         KernelApi::new(resolved_schema_json, client_id)
             .inspect(|api| {
                 #[cfg(target_arch = "wasm32")]
@@ -214,14 +215,14 @@ impl Kernel {
     pub fn fold_in_order(
         &self,
         flight: f64,
-        response_json: &str,
+        response_json: &[u8],
         already_delivered_json: Option<String>,
         base_json: Option<String>,
     ) -> Result<String, JsError> {
         self.pumped(self.api
             .fold_in_order(
                 flight as u64,
-                response_json,
+                std::str::from_utf8(response_json).map_err(|e| format!("response_json: {e}")).map_err(js)?,
                 already_delivered_json.as_deref(),
                 base_json.as_deref(),
             )
