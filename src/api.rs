@@ -550,6 +550,19 @@ impl KernelApi {
             .map(|s| s.clone())
             .unwrap_or_default()
     }
+
+    /// Load a lazy page's resolved program into this kernel (EXEC-LOAD-2).
+    pub fn register_lazy(&self, resolved_schema_json: &str) -> Result<(), String> {
+        self.record((|| {
+            let schema: OrbitalSchema = parse(resolved_schema_json, "lazy schema")?;
+            self.embedded.register_lazy(schema).map_err(|e| e.to_string())
+        })())
+    }
+
+    /// The page entered under `mount_key` closes; nothing when another page of this kernel entered since.
+    pub fn leave_mount(&self, mount_key: &str) -> Result<String, String> {
+        self.record(self.json(&self.embedded.leave_mount(mount_key)))
+    }
 }
 
 /// The server role: dispatches that stop at their I/O and go on when the host has answered.

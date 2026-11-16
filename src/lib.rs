@@ -144,6 +144,19 @@ impl Kernel {
             .map_err(js)
     }
 
+    /// Load a lazy page's resolved program into this kernel, so the page runs in its program's one kernel (EXEC-LOAD-2).
+    #[wasm_bindgen(js_name = registerLazy)]
+    pub fn register_lazy(&self, resolved_schema_json: &[u8]) -> Result<(), JsError> {
+        let resolved_schema_json = std::str::from_utf8(resolved_schema_json).map_err(|e| js(format!("resolved_schema_json: {e}")))?;
+        self.api.register_lazy(resolved_schema_json).map_err(js)
+    }
+
+    /// The page entered under `mountKey` closes; `[]` when another page of this kernel entered since.
+    #[wasm_bindgen(js_name = leaveMount)]
+    pub fn leave_mount(&self, mount_key: &str) -> Result<String, JsError> {
+        self.api.leave_mount(mount_key).map_err(js)
+    }
+
     /// Install the GPU answerer: from now on every `gpu/` ask is held in the kernel and answered here in ask order, and
     /// each outcome's route event is handed to `onCompletion` (see [`drain_client_gpu`]) for the host to dispatch with
     /// `dispatchHeld`, so no handle or byte crosses to JavaScript.
