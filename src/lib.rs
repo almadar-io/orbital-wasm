@@ -392,13 +392,6 @@ impl Kernel {
         self.api.dispatch_mode(trait_name).map_err(js)
     }
 
-    /// Whether the program's grants cover `requirement_json` (an `OsRequirement`): the browser host asks it before it
-    /// answers a `kv/` host ask from IndexedDB, as the native host checks its grants.
-    #[wasm_bindgen(js_name = osAllows)]
-    pub fn os_allows(&self, requirement_json: &str, orbital: Option<String>) -> Result<bool, JsError> {
-        self.api.embedded().os_allows_json(requirement_json, orbital.as_deref()).map_err(js)
-    }
-
     #[wasm_bindgen(js_name = getState)]
     pub fn get_state(&self, trait_name: &str, entity_id: Option<String>) -> String {
         self.api.get_state(trait_name, entity_id.as_deref())
