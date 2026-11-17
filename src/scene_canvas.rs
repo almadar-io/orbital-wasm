@@ -91,6 +91,20 @@ impl SceneCanvas {
         self.inner.semantic_tree()
     }
 
+    /// The texts below WCAG 2.2 AA contrast against the pixels painted behind them, as JSON
+    /// `[{ index, text, size, weight, ratio, required, rect }]` (`ratio` null where nothing is painted behind).
+    /// The audit is taken now and runs without holding this canvas, so frames keep drawing while it reads back.
+    #[wasm_bindgen(js_name = contrastAudit)]
+    pub fn contrast_audit(&self) -> js_sys::Promise {
+        audit(self.inner.contrast_audit_job(false))
+    }
+
+    /// [`Self::contrast_audit`] with every text and its measured ratio.
+    #[wasm_bindgen(js_name = contrastAuditAll)]
+    pub fn contrast_audit_all(&self) -> js_sys::Promise {
+        audit(self.inner.contrast_audit_job(true))
+    }
+
     #[wasm_bindgen(js_name = textInput)]
     pub fn text_input(&mut self, target: &str, text: &str, composing: bool) {
         self.inner.text_input(target, text, composing);
@@ -120,4 +134,18 @@ impl SceneCanvas {
     pub fn webgpu(&self) -> bool {
         self.inner.webgpu()
     }
+}
+
+/// A taken contrast audit as a promise of its JSON (`[]` with nothing drawn); it owns all it reads.
+fn audit(job: Option<orbital_canvas::web2d::ContrastJob>) -> js_sys::Promise {
+    wasm_bindgen_futures::future_to_promise(async move {
+        match job {
+            None => Ok(JsValue::from_str("[]")),
+            Some(job) => job
+                .run()
+                .await
+                .map(|json| JsValue::from_str(&json))
+                .map_err(|e| JsError::new(&e).into()),
+        }
+    })
 }
