@@ -374,6 +374,19 @@ impl Kernel {
         u32::try_from(self.api.tick_count()).unwrap_or(u32::MAX)
     }
 
+    /// Seed the identity the browser kept from an earlier visit (`FrameIdentity` JSON) before any server frame; `false`
+    /// when the kernel already holds one. The first server frame replaces it (EXEC-IDENTITY-4).
+    #[wasm_bindgen(js_name = seedIdentity)]
+    pub fn seed_identity(&self, identity_json: &str) -> Result<bool, JsValue> {
+        self.api.seed_identity(identity_json).map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// The identity this client holds (`FrameIdentity` JSON), or `undefined` while no server frame or seed set one.
+    #[wasm_bindgen(js_name = sessionIdentity)]
+    pub fn session_identity(&self) -> Result<Option<String>, JsValue> {
+        self.api.session_identity().map_err(|e| JsValue::from_str(&e))
+    }
+
     /// The theme key bound to this client's session (`theme/set`, mirrored from the server's frames), or `undefined`.
     #[wasm_bindgen(js_name = sessionTheme)]
     pub fn session_theme(&self) -> Option<String> {

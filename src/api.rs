@@ -390,6 +390,17 @@ impl KernelApi {
 
     /// The theme key the server bound to this client's session with `theme/set`, mirrored from its frames; `None` when
     /// none is bound and the declared themes apply (G-CROSS-395).
+    /// Seed the identity the browser kept (`FrameIdentity` JSON) while no server frame has set one; `false` when one has.
+    pub fn seed_identity(&self, identity_json: &str) -> Result<bool, String> {
+        let identity: orbital_core::effects::FrameIdentity = parse(identity_json, "identity")?;
+        Ok(self.embedded.seed_cached_identity(&identity))
+    }
+
+    /// The identity this client holds as `FrameIdentity` JSON, for the browser to keep; `None` while pending.
+    pub fn session_identity(&self) -> Result<Option<String>, String> {
+        self.embedded.session_identity_frame().map(|identity| to_json(&identity)).transpose()
+    }
+
     pub fn session_theme(&self) -> Option<String> {
         self.embedded
             .kernel()
