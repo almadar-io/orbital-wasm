@@ -1186,6 +1186,12 @@ pub fn os_completion_event(
     api::os_completion_event(site_json, key, outcome_json).map_err(js)
 }
 
+/// The `{ event, payload }` a deferred keyed `call-service` outcome fires on its call site, with the program's key, or `null`.
+#[wasm_bindgen(js_name = callCompletionEvent)]
+pub fn call_completion_event(site_json: &str, key: Option<String>, outcome_json: &str) -> Result<String, JsError> {
+    api::call_completion_event(site_json, key, outcome_json).map_err(js)
+}
+
 #[wasm_bindgen(js_name = isPublicAddress)]
 pub fn is_public_address(ip: &str) -> Result<bool, JsError> {
     ip.parse()

@@ -1058,6 +1058,12 @@ pub fn os_completion_event(
     orbital_core::embed::os_completion_event_json(site_json, key, outcome_json)
 }
 
+/// The `{ event, payload }` a deferred keyed `call-service` outcome (`{ ok }`, `{ error }` or `{ cancelled: true }`) fires on its
+/// call site, its payload carrying the program's key, or `null`.
+pub fn call_completion_event(site_json: &str, key: Option<String>, outcome_json: &str) -> Result<String, String> {
+    orbital_core::embed::call_completion_event_json(site_json, key.as_deref(), outcome_json)
+}
+
 pub fn expand_fx_layer(
     layer_json: &str,
     epoch_now_ms: f64,
