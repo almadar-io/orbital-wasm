@@ -456,6 +456,12 @@ impl Kernel {
         self.api.set_record_entity_after(record);
     }
 
+    /// Carry each executed hop's effects on the dispatch's transitions, for a verifier or debugger. Off by default (P-049).
+    #[wasm_bindgen(js_name = setHopEffects)]
+    pub fn set_hop_effects(&self, carry: bool) {
+        self.api.set_hop_effects(carry);
+    }
+
     /// Carry each tick's `effectResults` on the frame response, for a verifier. Off by default (P-015).
     #[wasm_bindgen(js_name = setFrameEffectResults)]
     pub fn set_frame_effect_results(&self, carry: bool) {

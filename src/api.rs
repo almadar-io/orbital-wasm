@@ -473,6 +473,11 @@ impl KernelApi {
         self.embedded.set_record_entity_after(record);
     }
 
+    /// Carry each executed hop's effects on the dispatch's transitions, for a verifier or debugger (P-049).
+    pub fn set_hop_effects(&self, carry: bool) {
+        self.embedded.set_hop_effects(carry);
+    }
+
     /// Carry each tick's `effectResults` on the frame response, for a verifier (P-015).
     pub fn set_frame_effect_results(&self, carry: bool) {
         self.embedded.set_frame_effect_results(carry);
