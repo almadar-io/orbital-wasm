@@ -405,6 +405,12 @@ impl Kernel {
         self.api.dispatch_mode(trait_name).map_err(js)
     }
 
+    /// The mode of a host-run dispatch this browser folds, as JSON text: a trait this program does not hold is the host's.
+    #[wasm_bindgen(js_name = hostDispatchMode)]
+    pub fn host_dispatch_mode(&self, trait_name: &str) -> Result<String, JsError> {
+        self.api.host_dispatch_mode(trait_name).map_err(js)
+    }
+
     #[wasm_bindgen(js_name = getState)]
     pub fn get_state(&self, trait_name: &str, entity_id: Option<String>) -> String {
         self.api.get_state(trait_name, entity_id.as_deref())

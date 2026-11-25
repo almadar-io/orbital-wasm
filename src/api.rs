@@ -416,6 +416,10 @@ impl KernelApi {
         self.record((|| self.json(&self.embedded.dispatch_mode(trait_name)?))())
     }
 
+    pub fn host_dispatch_mode(&self, trait_name: &str) -> Result<String, String> {
+        self.record(self.json(&self.embedded.host_dispatch_mode(trait_name)))
+    }
+
     pub fn get_state(&self, trait_name: &str, entity_id: Option<&str>) -> String {
         self.embedded.get_state(trait_name, entity_id)
     }
