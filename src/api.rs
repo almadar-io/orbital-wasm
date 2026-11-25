@@ -52,6 +52,11 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> Result<T, St
     serde_json::from_str(json).map_err(|e| format!("parse {what}: {e}"))
 }
 
+/// A program document: its repeated parts may be written once (`$def`, `json_value::program_from_json`).
+fn parse_program(json: &str, what: &str) -> Result<OrbitalSchema, String> {
+    orbital_core::json_value::program_from_json(json.as_bytes()).map_err(|e| format!("parse {what}: {e}"))
+}
+
 fn side_of(side: &str) -> Result<orbital_core::protocols::ProtocolSide, String> {
     serde_json::from_value(serde_json::Value::String(side.to_string()))
         .map_err(|e| format!("parse side: {e}"))
@@ -85,7 +90,7 @@ impl KernelApi {
 
     pub fn new(resolved_schema_json: &str, client_id: &str) -> Result<Self, ApiError> {
         let schema: OrbitalSchema =
-            parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
+            parse_program(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
         let embedded = EmbeddedKernel::new(schema, client_id)?;
         let trace = std::sync::Arc::new(orbital_core::runtime::dispatch_trace::TraceFeed::default());
         embedded.kernel().set_dispatch_observer(Some(std::sync::Arc::new(trace.observer())));
@@ -597,7 +602,7 @@ impl KernelApi {
     /// Load a lazy page's resolved program into this kernel (EXEC-LOAD-2).
     pub fn register_lazy(&self, resolved_schema_json: &str) -> Result<(), String> {
         self.record((|| {
-            let schema: OrbitalSchema = parse(resolved_schema_json, "lazy schema")?;
+            let schema: OrbitalSchema = parse_program(resolved_schema_json, "lazy schema")?;
             self.embedded.register_lazy(schema).map_err(|e| e.to_string())
         })())
     }
@@ -625,7 +630,7 @@ impl ServerApi {
         lazy: Option<std::sync::Arc<dyn orbital_core::runtime::LazySource>>,
     ) -> Result<Self, ApiError> {
         let schema: OrbitalSchema =
-            parse(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
+            parse_program(resolved_schema_json, "resolved schema").map_err(ApiError::Marshal)?;
         Ok(Self {
             embedded: EmbeddedServer::with_lazy_source(schema, lazy)?,
             last_error: Mutex::new(String::new()),

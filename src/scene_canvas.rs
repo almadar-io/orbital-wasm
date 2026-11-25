@@ -20,9 +20,7 @@ impl SceneCanvas {
     /// `node_json`: the render node (`{ "type": "physics-canvas", … }`).
     #[wasm_bindgen(js_name = setScene)]
     pub fn set_scene(&mut self, node_json: &str) -> Result<(), JsError> {
-        let node: serde_json::Value = serde_json::from_str(node_json)
-            .map_err(|e| JsError::new(&format!("node_json: {e}")))?;
-        self.inner.set_scene(node).map_err(|e| JsError::new(&e))
+        self.inner.set_scene_text(node_json).map_err(|e| JsError::new(&e))
     }
 
     pub fn resize(
